@@ -68,8 +68,26 @@ const App = {
     },
 
     initModal() {
-        document.getElementById('btnQuickAdd').addEventListener('click', () => {
-            this.openAddModal('subscription');
+        const btnAdd = document.getElementById('btnQuickAdd');
+        if (btnAdd) {
+            btnAdd.addEventListener('click', () => {
+                this.openAddModal('subscription');
+            });
+        }
+
+        const modal = document.getElementById('quickAddModal');
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeAddModal();
+                }
+            });
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeAddModal();
+            }
         });
 
         document.querySelectorAll('.modal-tab-btn').forEach(btn => {
