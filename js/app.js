@@ -685,6 +685,20 @@ const App = {
         `;
     },
 
+    async clearAppCache() {
+        try {
+            if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+            }
+            if (navigator.serviceWorker) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (let r of regs) { await r.unregister(); }
+            }
+        } catch (e) {}
+        window.location.reload(true);
+    },
+
     // --- 10. Settings & Database Import/Export ---
 
     populateSettings() {
