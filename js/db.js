@@ -305,6 +305,10 @@ class LifeDatabase {
         await this._saveToIndexedDB(binary);
     }
 
+    saveToDisk() {
+        return this.persist();
+    }
+
     _openIDB() {
         return new Promise((resolve, reject) => {
             const req = indexedDB.open(this.dbName, 1);
@@ -414,7 +418,7 @@ class LifeDatabase {
                 console.warn('Error inserting transaction:', e);
             }
         }
-        this.saveToDisk();
+        this.persist();
         return count;
     }
 
@@ -452,7 +456,7 @@ class LifeDatabase {
             ':b': balance,
             ':d': date || new Date().toISOString().split('T')[0]
         });
-        this.saveToDisk();
+        this.persist();
     }
 
     insertAccount(name, accountType, institution, balance) {
@@ -467,7 +471,7 @@ class LifeDatabase {
             ':d': new Date().toISOString().split('T')[0]
         });
         const lastId = this.query("SELECT last_insert_rowid() AS id")[0]?.id;
-        this.saveToDisk();
+        this.persist();
         return lastId;
     }
 
@@ -517,7 +521,7 @@ class LifeDatabase {
                 ':notes': notesStr
             });
         }
-        this.saveToDisk();
+        this.persist();
     }
 
     getSubscriptions() {
