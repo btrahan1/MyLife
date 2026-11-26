@@ -99,6 +99,10 @@ class LifeAI {
             return this._runOfflineRuleEngine(prompt);
         }
 
+        if (mode === 'nano') {
+            return this._callChromeBuiltInAi(prompt, onChunk);
+        }
+
         let endpoint = mode === 'local'
             ? window.db.getSetting('local_endpoint', '/api/llm/v1') + '/chat/completions'
             : window.db.getSetting('cloud_endpoint', 'https://api.openai.com/v1') + '/chat/completions';
@@ -197,6 +201,57 @@ INSTRUCTIONS:
         } catch (err) {
             console.warn('AI call failed, falling back to on-device engine:', err);
             return `*Note: Unable to reach ${endpoint} (${err.message}). Serving from on-device engine:*\n\n` + this._runOfflineRuleEngine(prompt);
+        }
+    }
+
+    // --- Chrome Built-in AI (Gemini Nano on Device) ---
+
+    async _callChromeBuiltInAi(prompt, onChunk) {
+        const modelApi = (typeof ai !== 'undefined' && ai.languageModel) || (window.ai && window.ai.languageModel);
+
+        if (!modelApi) {
+            return `⚠️ **Chrome Built-in AI (Gemini Nano) not detected in this Chrome session.**\n\n` +
+                   `To activate Gemini Nano in Android Chrome:\n` +
+                   `1. Open a new tab in Chrome and go to: \`chrome://flags/#prompt-api-for-gemini-nano\`\n` +
+                   `   ➔ Set to **Enabled**\n` +
+                   `2. Go to: \`chrome://flags/#optimization-guide-on-device-model\`\n` +
+                   `   ➔ Set to **Enabled BypassPerfRequirement**\n` +
+                   `3. Tap **Relaunch** at the bottom of Chrome.\n` +
+                   `4. Go to \`chrome://components\` and tap "Check for update" next to **Optimization Guide On Device Model**.\n\n` +
+                   `Once enabled, Gemini Nano runs 100% locally on your phone's processor with zero servers!`;
+        }
+
+        try {
+            const capabilities = await modelApi.capabilities();
+            if (capabilities.available === 'no') {
+                return `⚠️ Gemini Nano is not available on this device hardware (status: ${capabilities.available}).`;
+            }
+
+            const contextJson = window.db.getFullContextJson();
+            const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal assistant.
+All data is stored in the user's private SQLite vault on this device.
+Use this context to answer accurately:
+${contextJson}`;
+
+            if (onChunk) onChunk("🧠 Consulting on-device Gemini Nano...");
+
+            const session = await modelApi.create({
+                systemPrompt: systemPrompt
+            });
+
+            if (onChunk && session.promptStreaming) {
+                const stream = session.promptStreaming(prompt);
+                let fullText = '';
+                for await (const chunk of stream) {
+                    fullText = chunk;
+                    onChunk(fullText);
+                }
+                return fullText;
+            } else {
+                return await session.prompt(prompt);
+            }
+        } catch (err) {
+            return `⚠️ Gemini Nano error: ${err.message}. Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
     }
 

@@ -370,7 +370,8 @@
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 20px; border: 1px solid var(--border-color);">
-                                    <button class="btn-mode-chip active" id="chipLocal" onclick="App.setAiMode('local')">⚡ Local Qwen</button>
+                                    <button class="btn-mode-chip" id="chipNano" onclick="App.setAiMode('nano')">🧠 Chrome Nano</button>
+                                    <button class="btn-mode-chip" id="chipLocal" onclick="App.setAiMode('local')">⚡ Local Qwen</button>
                                     <button class="btn-mode-chip" id="chipOffline" onclick="App.setAiMode('offline')">📦 Offline Rules</button>
                                 </div>
                                 <button class="btn btn-sm btn-ghost" onclick="App.clearCopilotChat()">Clear</button>
@@ -424,6 +425,10 @@
                             <div class="form-group">
                                 <label class="form-label">Select AI Engine Tier</label>
                                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
+                                        <input type="radio" name="aiProvider" value="nano" id="aiModeNano">
+                                        <span><strong>Chrome Built-in AI (Gemini Nano)</strong> — Runs on phone NPU in Android Chrome</span>
+                                    </label>
                                     <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
                                         <input type="radio" name="aiProvider" value="offline" id="aiModeOffline" checked>
                                         <span><strong>On-Device Intelligent Rule Engine</strong> (100% Offline, Zero Server Required)</span>

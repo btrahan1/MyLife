@@ -135,18 +135,23 @@ const App = {
     },
 
     updateCopilotModeUI() {
-        const mode = window.db.getSetting('ai_mode', 'local');
+        const mode = window.db.getSetting('ai_mode', 'offline');
         const indicator = document.getElementById('copilotModeIndicator');
+        const chipNano = document.getElementById('chipNano');
         const chipLocal = document.getElementById('chipLocal');
         const chipOffline = document.getElementById('chipOffline');
 
         if (chipLocal && chipOffline) {
+            if (chipNano) chipNano.classList.toggle('active', mode === 'nano');
             chipLocal.classList.toggle('active', mode === 'local');
             chipOffline.classList.toggle('active', mode === 'offline');
         }
 
         if (indicator) {
-            if (mode === 'local') {
+            if (mode === 'nano') {
+                indicator.innerText = 'Engine: 🧠 Chrome Built-in AI (Gemini Nano on device)';
+                indicator.style.color = '#38bdf8';
+            } else if (mode === 'local') {
                 indicator.innerText = 'Engine: ⚡ Local Qwen 27B (port 8081)';
                 indicator.style.color = 'var(--accent-cyan)';
             } else if (mode === 'cloud') {
@@ -685,6 +690,7 @@ const App = {
 
         const mode = window.db.getSetting('ai_mode', 'offline');
         if (mode === 'disabled') document.getElementById('aiModeDisabled').checked = true;
+        else if (mode === 'nano') document.getElementById('aiModeNano').checked = true;
         else if (mode === 'local') document.getElementById('aiModeLocal').checked = true;
         else if (mode === 'cloud') document.getElementById('aiModeCloud').checked = true;
         else document.getElementById('aiModeOffline').checked = true;
