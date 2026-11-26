@@ -179,10 +179,12 @@ body {
 }
 
 /* App Body (Sidebar + Content) */
-.app-body {
+.app-body, .main-body {
     flex: 1;
     display: flex;
     overflow: hidden;
+    min-height: 0;
+    width: 100%;
 }
 
 /* Desktop Sidebar */
@@ -195,6 +197,8 @@ body {
     justify-content: space-between;
     padding: 16px 12px;
     flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .nav-group {
@@ -260,8 +264,12 @@ body {
 .content-viewport {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 32px 90px 32px;
     background-color: var(--bg-canvas);
+    min-height: 0;
+    height: 100%;
 }
 
 .tab-pane {
@@ -637,7 +645,7 @@ tbody td {
 .copilot-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 130px);
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
@@ -650,36 +658,10 @@ tbody td {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
 }
 
-.prompt-chips {
-    display: flex;
-    gap: 8px;
-    padding: 12px 24px;
-    border-bottom: 1px solid var(--border-color);
-    overflow-x: auto;
-    background: rgba(0, 0, 0, 0.15);
-}
-
-.chip {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.15s ease;
-}
-
-.chip:hover {
-    background: rgba(14, 165, 233, 0.15);
-    border-color: rgba(14, 165, 233, 0.4);
-    color: var(--accent-cyan);
-}
-
-.chat-transcript {
+.copilot-transcript, .chat-transcript {
     flex: 1;
     overflow-y: auto;
     padding: 24px;
@@ -687,69 +669,36 @@ tbody td {
     flex-direction: column;
     gap: 16px;
     user-select: text;
+    min-height: 0;
 }
 
-.chat-msg {
-    display: flex;
-    gap: 12px;
-    animation: fadeIn 0.2s ease;
-}
-
-.msg-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-}
-
-.chat-msg.user .msg-avatar {
-    background: rgba(14, 165, 233, 0.2);
-}
-
-.msg-bubble {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: 14px 18px;
-    font-size: 13.5px;
-    line-height: 1.6;
-    color: var(--text-primary);
-    max-width: 85%;
-}
-
-.chat-msg.user .msg-bubble {
-    background: rgba(14, 165, 233, 0.1);
-    border-color: rgba(14, 165, 233, 0.25);
-    margin-left: auto;
-}
-
-.msg-bubble ul, .msg-bubble ol {
-    margin-left: 20px;
-    margin-bottom: 8px;
-}
-
-.chat-input-row {
-    padding: 16px 24px;
+.copilot-composer, .chat-input-row {
+    padding: 16px 20px;
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 10px;
     background: var(--bg-surface);
+    flex-shrink: 0;
 }
 
-#copilotInput {
+.composer-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.composer-input, #copilotInput {
     flex: 1;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 10px 16px;
+    padding: 12px 16px;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 13.5px;
+    font-size: 14px;
+    outline: none;
+}
     outline: none;
 }
 
