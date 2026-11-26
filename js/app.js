@@ -232,13 +232,17 @@ const App = {
         }
     },
 
-    showSmartStatus(message, showSpinner = true) {
+    showSmartStatus(message, showSpinner = true, isHtml = false) {
         const banner = document.getElementById('modalSmartStatus');
         const spinner = document.getElementById('modalSmartSpinner');
         const text = document.getElementById('modalSmartStatusText');
         if (banner && text) {
             banner.style.display = 'flex';
-            text.innerText = message;
+            if (isHtml) {
+                text.innerHTML = message;
+            } else {
+                text.innerText = message;
+            }
             if (spinner) spinner.style.display = showSpinner ? 'block' : 'none';
         }
     },
@@ -262,10 +266,10 @@ const App = {
                     this.loadDashboard();
 
                     let msg = ingest.isNewAccount
-                        ? `✨ Created ${ingest.accountName}: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and ${ingest.importedCount} transactions imported!`
-                        : `✨ ${ingest.accountName} updated: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and ${ingest.importedCount} new transactions!`;
+                        ? `✨ Created <strong>${this.escape(ingest.accountName)}</strong>: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and <strong>${ingest.importedCount} transactions</strong> imported! <button type="button" class="btn btn-sm btn-ghost" style="margin-left:8px; text-decoration:underline; color:var(--accent-cyan);" onclick="App.closeAddModal(); App.switchTab('finances');">View in Finances ➔</button>`
+                        : `✨ <strong>${this.escape(ingest.accountName)}</strong> updated: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and <strong>${ingest.importedCount} transactions</strong> imported! <button type="button" class="btn btn-sm btn-ghost" style="margin-left:8px; text-decoration:underline; color:var(--accent-cyan);" onclick="App.closeAddModal(); App.switchTab('finances');">View in Finances ➔</button>`;
 
-                    this.showSmartStatus(msg, false);
+                    this.showSmartStatus(msg, false, true);
                     this._lastExtractedText = parsed.rawText;
                     this._lastSourceName = `${sourceName} (${file.name})`;
                     await this.autoFillFromText(parsed.rawText, this._lastSourceName);

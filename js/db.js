@@ -570,7 +570,7 @@ class LifeDatabase {
 
     deleteRecord(table, id) {
         // Sanitize table name against whitelist
-        const allowed = ['accounts', 'subscriptions', 'prescriptions', 'appointments', 'milestones', 'maintenance', 'shopping_items', 'voice_notes', 'family_members'];
+        const allowed = ['accounts', 'subscriptions', 'transactions', 'prescriptions', 'appointments', 'milestones', 'maintenance', 'shopping_items', 'voice_notes', 'family_members'];
         if (!allowed.includes(table)) throw new Error('Invalid table: ' + table);
         this.run(`DELETE FROM ${table} WHERE id = :id`, { ':id': id });
     }
@@ -580,6 +580,7 @@ class LifeDatabase {
         return JSON.stringify({
             accounts: this.getAccounts(),
             subscriptions: this.getSubscriptions(),
+            recentTransactions: this.getTransactions(null, 60),
             prescriptions: this.getPrescriptions(),
             appointments: this.getAppointments(),
             milestones: this.getMilestones(),
