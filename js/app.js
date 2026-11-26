@@ -158,7 +158,7 @@ const App = {
 
         if (indicator) {
             if (mode === 'webllm') {
-                const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+                const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
                 const shortName = model.split('-')[0] + ' ' + model.split('-')[1];
                 indicator.innerText = `Engine: 🌐 In-Browser WebGPU (${shortName} on device)`;
                 indicator.style.color = '#38bdf8';
@@ -715,7 +715,7 @@ const App = {
         
         const webllmModelSelect = document.getElementById('settingWebLLMModel');
         if (webllmModelSelect) {
-            webllmModelSelect.value = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+            webllmModelSelect.value = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
         }
 
         const mode = window.db.getSetting('ai_mode', 'offline');
@@ -731,7 +731,7 @@ const App = {
         const userName = document.getElementById('settingUserName').value.trim() || 'Bart';
         const localEndpoint = document.getElementById('settingLocalEndpoint').value.trim();
         const cloudApiKey = document.getElementById('settingCloudKey').value.trim();
-        const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+        const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
         window.db.setSetting('ai_mode', mode);
         window.db.setSetting('user_name', userName);

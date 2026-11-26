@@ -26,7 +26,7 @@ class LifeAI {
         }
         try {
             const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-            const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+            const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
             this.webllmEngine = await webllm.CreateMLCEngine(model, {
                 initProgressCallback: (report) => {
                     if (indicator) {
@@ -268,7 +268,7 @@ INSTRUCTIONS:
                    `Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
 
-        const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+        const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
 
         if (!this.webllmEngine) {
             if (this.webllmLoading) {
