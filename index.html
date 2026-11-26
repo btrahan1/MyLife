@@ -526,6 +526,48 @@
                 <button class="modal-tab-btn" data-type="family">Family Member</button>
             </div>
 
+            <!-- Multimodal Smart Input & Drag-Drop Zone -->
+            <div class="modal-smart-zone" id="modalDropZone">
+                <div class="smart-zone-header">
+                    <span class="smart-zone-title"><span class="smart-sparkle">✨</span> AI Auto-Fill</span>
+                    <span class="smart-zone-hint">Dictate, snap a photo, or drop a document to fill fields</span>
+                </div>
+                
+                <div class="smart-actions-row">
+                    <!-- Voice Mic Button -->
+                    <button type="button" class="smart-tool-btn" id="modalMicBtn" title="Speak to auto-fill fields">
+                        <span class="smart-tool-icon">🎙️</span>
+                        <span class="smart-tool-label">Voice</span>
+                    </button>
+
+                    <!-- Camera Button -->
+                    <button type="button" class="smart-tool-btn" id="modalCameraBtn" title="Take photo of bill, receipt, or bottle">
+                        <span class="smart-tool-icon">📷</span>
+                        <span class="smart-tool-label">Camera</span>
+                    </button>
+                    <input type="file" id="modalCameraInput" accept="image/*" capture="environment" style="display:none">
+
+                    <!-- Upload Button -->
+                    <button type="button" class="smart-tool-btn" id="modalUploadBtn" title="Upload image, document, or receipt">
+                        <span class="smart-tool-icon">📁</span>
+                        <span class="smart-tool-label">Upload</span>
+                    </button>
+                    <input type="file" id="modalFileInput" accept="image/*,.txt,.csv,.json" style="display:none">
+                </div>
+
+                <!-- Drag & Drop visual prompt -->
+                <div class="smart-drop-prompt">
+                    <span class="drop-icon">📥</span>
+                    <span class="drop-text">or drag & drop receipt, bill, or invoice image here</span>
+                </div>
+
+                <!-- Status & Progress Banner -->
+                <div class="smart-status-banner" id="modalSmartStatus" style="display:none">
+                    <div class="smart-status-spinner" id="modalSmartSpinner"></div>
+                    <span class="smart-status-text" id="modalSmartStatusText">Listening...</span>
+                </div>
+            </div>
+
             <!-- Form: Subscription -->
             <form id="formSubscription" class="modal-form active" onsubmit="App.handleAddSubscription(event)">
                 <div class="form-group">

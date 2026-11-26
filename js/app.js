@@ -96,6 +96,8 @@ const App = {
                 this.switchModalTab(type);
             });
         });
+
+        this.initSmartInput();
     },
 
     openAddModal(defaultType = 'subscription') {
@@ -105,6 +107,13 @@ const App = {
 
     closeAddModal() {
         document.getElementById('quickAddModal').classList.remove('active');
+        const banner = document.getElementById('modalSmartStatus');
+        if (banner) banner.style.display = 'none';
+        const micBtn = document.getElementById('modalMicBtn');
+        if (micBtn) micBtn.classList.remove('listening');
+        if (window.voice && window.voice.isListening) {
+            window.voice.stopListening();
+        }
     },
 
     switchModalTab(type) {
@@ -119,6 +128,238 @@ const App = {
         const formId = 'form' + type.charAt(0).toUpperCase() + type.slice(1);
         const formEl = document.getElementById(formId);
         if (formEl) formEl.classList.add('active');
+    },
+
+    initSmartInput() {
+        const dropZone = document.getElementById('modalDropZone');
+        const micBtn = document.getElementById('modalMicBtn');
+        const cameraBtn = document.getElementById('modalCameraBtn');
+        const cameraInput = document.getElementById('modalCameraInput');
+        const uploadBtn = document.getElementById('modalUploadBtn');
+        const fileInput = document.getElementById('modalFileInput');
+
+        // 1. Voice Dictation
+        if (micBtn) {
+            micBtn.addEventListener('click', () => {
+                if (!window.voice || !window.voice.isSupported()) {
+                    alert('Voice recognition is not supported on this browser or requires HTTPS.');
+                    return;
+                }
+
+                if (window.voice.isListening) {
+                    window.voice.stopListening();
+                } else {
+                    this.showSmartStatus('🎙️ Listening... Speak naturally (e.g. "Electric bill $85 due Dec 15")', true);
+                    window.voice.startListening('modal_autofill', (transcript, isFinal) => {
+                        this.showSmartStatus(`🎙️ "${transcript}"`, true);
+                        if (isFinal && transcript.trim()) {
+                            this.autoFillFromText(transcript.trim(), 'Voice Dictation');
+                        }
+                    }, (listening) => {
+                        micBtn.classList.toggle('listening', listening);
+                        if (!listening) {
+                            setTimeout(() => {
+                                const banner = document.getElementById('modalSmartStatus');
+                                if (banner && banner.innerText.includes('Listening')) {
+                                    banner.style.display = 'none';
+                                }
+                            }, 2000);
+                        }
+                    });
+                }
+            });
+        }
+
+        // 2. Camera Button & Input
+        if (cameraBtn && cameraInput) {
+            cameraBtn.addEventListener('click', () => {
+                cameraInput.click();
+            });
+            cameraInput.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    this.processInputFile(file, 'Camera Photo');
+                }
+                cameraInput.value = '';
+            });
+        }
+
+        // 3. Upload File Button & Input
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    this.processInputFile(file, 'Uploaded File');
+                }
+                fileInput.value = '';
+            });
+        }
+
+        // 4. Drag & Drop on Drop Zone
+        if (dropZone) {
+            ['dragenter', 'dragover'].forEach(name => {
+                dropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('drag-active');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(name => {
+                dropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('drag-active');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const file = e.dataTransfer?.files?.[0];
+                if (file) {
+                    this.processInputFile(file, 'Drag & Drop');
+                }
+            });
+        }
+    },
+
+    showSmartStatus(message, showSpinner = true) {
+        const banner = document.getElementById('modalSmartStatus');
+        const spinner = document.getElementById('modalSmartSpinner');
+        const text = document.getElementById('modalSmartStatusText');
+        if (banner && text) {
+            banner.style.display = 'flex';
+            text.innerText = message;
+            if (spinner) spinner.style.display = showSpinner ? 'block' : 'none';
+        }
+    },
+
+    async processInputFile(file, sourceName) {
+        if (!file) return;
+
+        if (file.type.startsWith('image/')) {
+            this.showSmartStatus(`📷 Scanning image with OCR...`, true);
+            try {
+                const text = await this.extractTextFromImage(file, (msg) => {
+                    this.showSmartStatus(`📷 ${msg}`, true);
+                });
+                if (!text || !text.trim()) {
+                    this.showSmartStatus(`⚠️ No text detected in image. Please try another photo or dictate with voice.`, false);
+                    return;
+                }
+                await this.autoFillFromText(text.trim(), `${sourceName} (OCR)`);
+            } catch (err) {
+                console.error('OCR Error:', err);
+                this.showSmartStatus(`⚠️ OCR scan error: ${err.message}`, false);
+            }
+        } else {
+            // Text, CSV, JSON
+            this.showSmartStatus(`📄 Reading ${file.name}...`, true);
+            try {
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const text = reader.result;
+                    if (text && text.trim()) {
+                        await this.autoFillFromText(text.trim(), sourceName);
+                    }
+                };
+                reader.readAsText(file);
+            } catch (err) {
+                this.showSmartStatus(`⚠️ Failed to read file: ${err.message}`, false);
+            }
+        }
+    },
+
+    async extractTextFromImage(file, onProgress) {
+        if (!window.Tesseract) {
+            if (onProgress) onProgress('Loading OCR engine (Tesseract WASM)...');
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Failed to load OCR library. Check network connection.'));
+                document.head.appendChild(script);
+            });
+        }
+
+        const worker = await window.Tesseract.createWorker('eng', 1, {
+            logger: m => {
+                if (m.status === 'recognizing text' && onProgress) {
+                    const pct = Math.round((m.progress || 0) * 100);
+                    onProgress(`Recognizing text (${pct}%)...`);
+                }
+            }
+        });
+
+        const ret = await worker.recognize(file);
+        await worker.terminate();
+        return ret.data?.text || '';
+    },
+
+    async autoFillFromText(rawText, sourceName) {
+        const activeTabBtn = document.querySelector('.modal-tab-btn.active');
+        const activeTab = activeTabBtn ? activeTabBtn.getAttribute('data-type') : 'subscription';
+
+        this.showSmartStatus(`🧠 AI analyzing details for ${activeTab}...`, true);
+
+        try {
+            const data = await window.ai.extractFormData(rawText, activeTab);
+            if (data && Object.keys(data).length > 0) {
+                const filledCount = this.populateFormFields(activeTab, data);
+                if (filledCount > 0) {
+                    this.showSmartStatus(`✨ Auto-filled ${filledCount} field${filledCount > 1 ? 's' : ''} from ${sourceName}!`, false);
+                } else {
+                    this.showSmartStatus(`ℹ️ Found details, but no matching fields for ${activeTab}.`, false);
+                }
+            } else {
+                this.showSmartStatus(`⚠️ Could not detect fields from input. You can enter them manually.`, false);
+            }
+        } catch (err) {
+            console.error('Auto-fill error:', err);
+            this.showSmartStatus(`⚠️ Extraction error: ${err.message}`, false);
+        }
+    },
+
+    populateFormFields(type, data) {
+        const formId = 'form' + type.charAt(0).toUpperCase() + type.slice(1);
+        const form = document.getElementById(formId);
+        if (!form) return 0;
+
+        let filledCount = 0;
+
+        for (const [key, val] of Object.entries(data)) {
+            if (val === null || val === undefined || val === '') continue;
+
+            const input = form.elements[key];
+            if (!input) continue;
+
+            if (input.type === 'checkbox') {
+                input.checked = Boolean(val);
+                filledCount++;
+                input.classList.add('field-highlight');
+                setTimeout(() => input.classList.remove('field-highlight'), 2500);
+            } else if (input.tagName === 'SELECT') {
+                const valLower = String(val).toLowerCase();
+                for (let i = 0; i < input.options.length; i++) {
+                    if (input.options[i].value.toLowerCase() === valLower || input.options[i].text.toLowerCase().includes(valLower)) {
+                        input.selectedIndex = i;
+                        filledCount++;
+                        input.classList.add('field-highlight');
+                        setTimeout(() => input.classList.remove('field-highlight'), 2500);
+                        break;
+                    }
+                }
+            } else {
+                input.value = val;
+                filledCount++;
+                input.classList.add('field-highlight');
+                setTimeout(() => input.classList.remove('field-highlight'), 2500);
+            }
+        }
+
+        return filledCount;
     },
 
     initEventListeners() {

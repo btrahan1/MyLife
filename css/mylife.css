@@ -936,6 +936,149 @@ tbody td {
     background: rgba(0, 240, 255, 0.05);
 }
 
+/* Multimodal Smart Input & Drag-Drop */
+.modal-smart-zone {
+    margin: 14px 18px 4px 18px;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.06), rgba(59, 130, 246, 0.04));
+    border: 1px dashed rgba(6, 182, 212, 0.35);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.modal-smart-zone.drag-active {
+    background: rgba(6, 182, 212, 0.16);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 18px rgba(6, 182, 212, 0.3);
+    transform: scale(1.01);
+}
+
+.smart-zone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.smart-zone-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.smart-zone-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.smart-actions-row {
+    display: flex;
+    gap: 8px;
+}
+
+.smart-tool-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.smart-tool-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.smart-tool-btn.listening {
+    background: rgba(244, 63, 94, 0.18);
+    border-color: var(--accent-rose);
+    color: var(--accent-rose);
+    animation: pulseMic 1.2s infinite;
+}
+
+@keyframes pulseMic {
+    0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
+    70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+.smart-tool-icon {
+    font-size: 15px;
+}
+
+.smart-drop-prompt {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0.85;
+}
+
+.smart-status-banner {
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-primary);
+    animation: modalPop 0.2s ease;
+}
+
+.smart-status-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(6, 182, 212, 0.2);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Field highlight animation when auto-filled */
+.field-highlight {
+    animation: fieldGlow 2.5s ease;
+}
+
+@keyframes fieldGlow {
+    0% {
+        border-color: var(--accent-cyan);
+        box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.4);
+        background-color: rgba(6, 182, 212, 0.12);
+    }
+    100% {
+        border-color: var(--border-color);
+        box-shadow: none;
+        background-color: var(--bg-card);
+    }
+}
+
 .modal-body {
     padding: 20px;
 }

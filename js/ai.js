@@ -447,6 +447,257 @@ ${contextJson}`;
 
         return `Hello **${briefing.greeting.replace('!', '')}**! I am your **MyLife Co-Pilot**.\n\nHere is your quick summary today:\n- 💳 **Bills in next 10d:** ${briefing.upcomingBills.length}\n- 💊 **Prescriptions needing refills:** ${briefing.refillsDue.length}\n- 💰 **Net Worth:** $${Number(briefing.totalNetWorth).toLocaleString()}\n\nAsk me anything about your finances, health, vehicle, shopping list, or milestones!`;
     }
+
+    // --- Multimodal Form Extraction Engine ---
+
+    async extractFormData(text, targetType) {
+        if (!text || !text.trim()) return {};
+
+        const mode = window.db ? window.db.getSetting('ai_mode', 'local') : 'local';
+
+        // 1. If LLM is available, attempt structured extraction
+        if (mode === 'local' || mode === 'webllm' || mode === 'cloud') {
+            try {
+                const schemaGuide = {
+                    subscription: '{"name":"string","amount":19.99,"cadence":"Monthly|Annual|Weekly","category":"Utilities|Streaming|Software|Shopping|Insurance","nextBillingDate":"YYYY-MM-DD","notes":"string"}',
+                    account: '{"name":"string","accountType":"Checking|Savings|Credit Card|Retirement|Investment","institution":"string","balance":1250.00}',
+                    prescription: '{"medicationName":"string","dosage":"string","frequency":"string","refillsRemaining":2,"nextRefillDate":"YYYY-MM-DD","pharmacy":"string"}',
+                    milestone: '{"title":"string","milestoneType":"Birthday|Anniversary|Holiday|Goal","targetDate":"YYYY-MM-DD","giftIdeas":"string"}',
+                    maintenance: '{"title":"string","category":"Vehicle|Home|Appliance|Tech","nextDueDate":"YYYY-MM-DD","cost":45.00,"vendor":"string"}',
+                    family: '{"name":"string","relationship":"string","phone":"string","email":"string","isEmergency":true|false}'
+                }[targetType] || '{}';
+
+                const prompt = `You are a precise data extraction engine.
+Extract information from the user's input to populate a "${targetType}" record.
+Today's date is: ${new Date().toISOString().split('T')[0]}.
+Return ONLY valid JSON matching this schema:
+${schemaGuide}
+Do not include markdown codeblocks or explanations. Only output raw JSON.
+
+USER INPUT:
+"""
+${text}
+"""`;
+
+                let rawResponse = '';
+                if (mode === 'webllm') {
+                    rawResponse = await this._callWebLLM(prompt);
+                } else {
+                    rawResponse = await this._callLLM(prompt, mode);
+                }
+
+                const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    return this._mergeAndValidateFields(parsed, text, targetType);
+                }
+            } catch (err) {
+                console.warn('AI LLM form extraction error, falling back to deterministic parser:', err);
+            }
+        }
+
+        // 2. Deterministic offline rule-based parser (always available and instant!)
+        return this._extractFieldsOffline(text, targetType);
+    }
+
+    _mergeAndValidateFields(parsed, rawText, targetType) {
+        const offline = this._extractFieldsOffline(rawText, targetType);
+        const merged = { ...offline, ...parsed };
+
+        for (const k in merged) {
+            if (merged[k] === null || merged[k] === undefined || merged[k] === 'null' || merged[k] === '') {
+                delete merged[k];
+            }
+        }
+        return merged;
+    }
+
+    _parseFlexibleDate(text) {
+        if (!text) return null;
+        const now = new Date();
+
+        // 1. ISO format: 2026-12-25
+        const isoMatch = text.match(/\b(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/);
+        if (isoMatch) return isoMatch[0];
+
+        // 2. US slash format: 12/25/2026 or 12/25/26 or 12/25
+        const slashMatch = text.match(/\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])(?:\/(\d{2,4}))?\b/);
+        if (slashMatch) {
+            const m = String(slashMatch[1]).padStart(2, '0');
+            const d = String(slashMatch[2]).padStart(2, '0');
+            let y = slashMatch[3] ? parseInt(slashMatch[3], 10) : now.getFullYear();
+            if (y < 100) y += 2000;
+            return `${y}-${m}-${d}`;
+        }
+
+        // 3. Named month: "December 15, 2026", "Dec 15th", "15 Dec 2026"
+        const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+        const monthRegex = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/i;
+        const mMatch = text.match(monthRegex);
+        if (mMatch) {
+            const mKey = mMatch[1].toLowerCase().slice(0, 3);
+            const m = String(months[mKey]).padStart(2, '0');
+            const d = String(mMatch[2]).padStart(2, '0');
+            const y = mMatch[3] ? parseInt(mMatch[3], 10) : now.getFullYear();
+            return `${y}-${m}-${d}`;
+        }
+
+        // 4. "due on the 15th" or "on the 5th"
+        const dayMatch = text.match(/\b(?:due\s+on\s+the|on\s+the)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+        if (dayMatch) {
+            const day = parseInt(dayMatch[1], 10);
+            let m = now.getMonth();
+            let y = now.getFullYear();
+            if (day < now.getDate()) m++;
+            if (m > 11) { m = 0; y++; }
+            return `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        // 5. "in X days" or "in X weeks"
+        const relMatch = text.match(/\bin\s+(\d+)\s*(days?|weeks?|months?)\b/i);
+        if (relMatch) {
+            const num = parseInt(relMatch[1], 10);
+            const unit = relMatch[2].toLowerCase();
+            const d = new Date();
+            if (unit.startsWith('day')) d.setDate(d.getDate() + num);
+            else if (unit.startsWith('week')) d.setDate(d.getDate() + (num * 7));
+            else if (unit.startsWith('month')) d.setMonth(d.getMonth() + num);
+            return d.toISOString().split('T')[0];
+        }
+
+        // 6. "tomorrow" / "next week"
+        if (/\btomorrow\b/i.test(text)) {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            return d.toISOString().split('T')[0];
+        }
+        if (/\bnext week\b/i.test(text)) {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            return d.toISOString().split('T')[0];
+        }
+
+        return null;
+    }
+
+    _extractFieldsOffline(text, targetType) {
+        if (!text) return {};
+        const res = {};
+        const date = this._parseFlexibleDate(text);
+
+        // Dollar amount
+        const amountMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)|\b(\d+\.\d{2})\b|\b(\d+)\s*(?:dollars?|bucks)/i);
+        const amountVal = amountMatch ? parseFloat(amountMatch[1] || amountMatch[2] || amountMatch[3]) : null;
+
+        if (targetType === 'subscription') {
+            if (amountVal !== null) res.amount = amountVal;
+            if (date) res.nextBillingDate = date;
+
+            // Cadence
+            if (/annual|yearly|per year|\/yr/i.test(text)) res.cadence = 'Annual';
+            else if (/weekly|per week|\/wk/i.test(text)) res.cadence = 'Weekly';
+            else if (/monthly|per month|\/mo/i.test(text)) res.cadence = 'Monthly';
+
+            // Category
+            if (/electric|power|water|gas|utility|utilities|trash|sewer|internet|wifi/i.test(text)) res.category = 'Utilities';
+            else if (/netflix|spotify|hulu|disney|hbo|paramount|youtube|streaming|apple tv/i.test(text)) res.category = 'Streaming';
+            else if (/github|adobe|office|chatgpt|openai|software|hosting|aws|cloud/i.test(text)) res.category = 'Software';
+            else if (/amazon|costco|walmart|shopping/i.test(text)) res.category = 'Shopping';
+            else if (/insurance|geico|progressive|state farm|allstate/i.test(text)) res.category = 'Insurance';
+
+            // Name
+            let name = text.replace(/(i subscribed to|subscribed to|add subscription for|subscription|bill for|\$\s*\d+(\.\d{2})?|per month|monthly|due on.*)/gi, '').trim();
+            name = name.split(/[\n,;]/)[0].trim();
+            if (name.length > 1 && name.length < 50) res.name = name;
+        }
+
+        if (targetType === 'account') {
+            if (amountVal !== null) res.balance = amountVal;
+
+            if (/checking/i.test(text)) res.accountType = 'Checking';
+            else if (/savings|hysa|high yield/i.test(text)) res.accountType = 'Savings';
+            else if (/credit card|card|visa|mastercard|amex/i.test(text)) res.accountType = 'Credit Card';
+            else if (/401k|ira|roth|retirement/i.test(text)) res.accountType = 'Retirement';
+            else if (/investment|brokerage|trading/i.test(text)) res.accountType = 'Investment';
+
+            const instMatch = text.match(/\b(Chase|Fidelity|Vanguard|Charles Schwab|Schwab|Bank of America|BofA|Wells Fargo|Capital One|Citi|Discover|Ally)\b/i);
+            if (instMatch) res.institution = instMatch[1];
+
+            let name = text.replace(/(account|balance|\$\s*\d+(\.\d{2})?)/gi, '').trim();
+            name = name.split(/[\n,;]/)[0].trim();
+            if (name.length > 1 && name.length < 50) res.name = name;
+        }
+
+        if (targetType === 'prescription') {
+            if (date) res.nextRefillDate = date;
+
+            const dosageMatch = text.match(/\b(\d+(?:\.\d+)?\s*(?:mg|mcg|ml|g|units?))\b/i);
+            if (dosageMatch) res.dosage = dosageMatch[1];
+
+            const pharmMatch = text.match(/\b(CVS(?:\s+Pharmacy)?|Walgreens|Costco|Walmart|Rite Aid|Kroger|Publix|Target)\b/i);
+            if (pharmMatch) res.pharmacy = pharmMatch[1];
+
+            const refillMatch = text.match(/\b(\d+)\s*refills?\b/i);
+            if (refillMatch) res.refillsRemaining = parseInt(refillMatch[1], 10);
+
+            const freqMatch = text.match(/\b(once daily|twice daily|three times daily|every \d+ hours?|at bedtime|in the morning|with food|as needed|q\.?d\.?|b\.?i\.?d\.?)\b/i);
+            if (freqMatch) res.frequency = freqMatch[1];
+
+            const rxNameMatch = text.match(/\b([A-Z][a-z]{3,}(?:\s+[A-Z][a-z]+)?)\b/);
+            if (rxNameMatch && !['Pharmacy', 'Daily', 'Refill', 'Tablet', 'Capsule', 'Rx', 'Prescription'].includes(rxNameMatch[1])) {
+                res.medicationName = rxNameMatch[1];
+            }
+        }
+
+        if (targetType === 'milestone') {
+            if (date) res.targetDate = date;
+
+            if (/birthday|bday/i.test(text)) res.milestoneType = 'Birthday';
+            else if (/anniversary/i.test(text)) res.milestoneType = 'Anniversary';
+            else if (/holiday|christmas|thanksgiving|easter/i.test(text)) res.milestoneType = 'Holiday';
+            else if (/goal|target|deadline/i.test(text)) res.milestoneType = 'Goal';
+
+            let title = text.split(/[\n,;]/)[0].replace(/(remind me|milestone|target date.*)/gi, '').trim();
+            if (title.length > 1 && title.length < 60) res.title = title;
+        }
+
+        if (targetType === 'maintenance') {
+            if (amountVal !== null) res.cost = amountVal;
+            if (date) res.nextDueDate = date;
+
+            if (/oil|tire|brake|car|truck|vehicle|wiper|transmission/i.test(text)) res.category = 'Vehicle';
+            else if (/hvac|ac|heat|filter|plumb|roof|gutter|lawn|pipe/i.test(text)) res.category = 'Home';
+            else if (/fridge|refrigerator|washer|dryer|dishwasher|oven|stove/i.test(text)) res.category = 'Appliance';
+            else if (/pc|laptop|backup|router|wifi|battery|server/i.test(text)) res.category = 'Tech';
+
+            const vendorMatch = text.match(/\b(DIY|Valvoline|Jiffy Lube|Firestone|Dealership|Home Depot|Lowe's|Best Buy|Geek Squad)\b/i);
+            if (vendorMatch) res.vendor = vendorMatch[1];
+
+            let title = text.split(/[\n,;]/)[0].replace(/(maintenance|service|\$\s*\d+.*)/gi, '').trim();
+            if (title.length > 1 && title.length < 60) res.title = title;
+        }
+
+        if (targetType === 'family') {
+            const phoneMatch = text.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+            if (phoneMatch) res.phone = phoneMatch[0];
+
+            const emailMatch = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+            if (emailMatch) res.email = emailMatch[0];
+
+            if (/spouse|wife|husband/i.test(text)) res.relationship = 'Spouse';
+            else if (/son|daughter|child|kid/i.test(text)) res.relationship = 'Child';
+            else if (/mother|father|mom|dad|parent/i.test(text)) res.relationship = 'Parent';
+            else if (/brother|sister|sibling/i.test(text)) res.relationship = 'Sibling';
+            else if (/friend/i.test(text)) res.relationship = 'Friend';
+
+            if (/emergency|ice/i.test(text)) res.isEmergency = true;
+
+            const nameMatch = text.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+            if (nameMatch) res.name = nameMatch[1];
+        }
+
+        return res;
+    }
 }
 
 window.ai = new LifeAI();
