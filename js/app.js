@@ -141,19 +141,21 @@ const App = {
     updateCopilotModeUI() {
         const mode = window.db.getSetting('ai_mode', 'offline');
         const indicator = document.getElementById('copilotModeIndicator');
-        const chipNano = document.getElementById('chipNano');
+        const chipWebLLM = document.getElementById('chipWebLLM');
         const chipLocal = document.getElementById('chipLocal');
         const chipOffline = document.getElementById('chipOffline');
 
         if (chipLocal && chipOffline) {
-            if (chipNano) chipNano.classList.toggle('active', mode === 'nano');
+            if (chipWebLLM) chipWebLLM.classList.toggle('active', mode === 'webllm');
             chipLocal.classList.toggle('active', mode === 'local');
             chipOffline.classList.toggle('active', mode === 'offline');
         }
 
         if (indicator) {
-            if (mode === 'nano') {
-                indicator.innerText = 'Engine: 🧠 Chrome Built-in AI (Gemini Nano on device)';
+            if (mode === 'webllm') {
+                const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+                const shortName = model.split('-')[0] + ' ' + model.split('-')[1];
+                indicator.innerText = `Engine: 🌐 In-Browser WebGPU (${shortName} on device)`;
                 indicator.style.color = '#38bdf8';
             } else if (mode === 'local') {
                 indicator.innerText = 'Engine: ⚡ Local Qwen 27B (port 8081)';
@@ -705,10 +707,15 @@ const App = {
         document.getElementById('settingUserName').value = window.db.getSetting('user_name', 'Bart');
         document.getElementById('settingLocalEndpoint').value = window.db.getSetting('local_endpoint', 'http://127.0.0.1:8081/v1');
         document.getElementById('settingCloudKey').value = window.db.getSetting('cloud_api_key', '');
+        
+        const webllmModelSelect = document.getElementById('settingWebLLMModel');
+        if (webllmModelSelect) {
+            webllmModelSelect.value = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+        }
 
         const mode = window.db.getSetting('ai_mode', 'offline');
         if (mode === 'disabled') document.getElementById('aiModeDisabled').checked = true;
-        else if (mode === 'nano') document.getElementById('aiModeNano').checked = true;
+        else if (mode === 'webllm') document.getElementById('aiModeWebLLM').checked = true;
         else if (mode === 'local') document.getElementById('aiModeLocal').checked = true;
         else if (mode === 'cloud') document.getElementById('aiModeCloud').checked = true;
         else document.getElementById('aiModeOffline').checked = true;
@@ -719,11 +726,13 @@ const App = {
         const userName = document.getElementById('settingUserName').value.trim() || 'Bart';
         const localEndpoint = document.getElementById('settingLocalEndpoint').value.trim();
         const cloudApiKey = document.getElementById('settingCloudKey').value.trim();
+        const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 
         window.db.setSetting('ai_mode', mode);
         window.db.setSetting('user_name', userName);
         window.db.setSetting('local_endpoint', localEndpoint);
         window.db.setSetting('cloud_api_key', cloudApiKey);
+        window.db.setSetting('webllm_model', webllmModel);
 
         alert('Settings saved successfully!');
         this.loadDashboard();

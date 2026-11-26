@@ -2,7 +2,7 @@
  * MyLife PWA Service Worker (Offline Cache & Background Sync)
  */
 
-const CACHE_NAME = 'mylife-v1.0.7';
+const CACHE_NAME = 'mylife-v1.0.8';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -43,9 +43,10 @@ self.addEventListener('fetch', event => {
     // Only cache GET requests
     if (event.request.method !== 'GET') return;
 
-    // Skip external API endpoints (like local LLM 8081 or OpenAI)
+    // Skip external API endpoints and WebLLM CDNs
     const url = new URL(event.request.url);
-    if (url.port === '8081' || url.hostname.includes('api.openai.com') || url.hostname.includes('anthropic.com')) {
+    if (url.port === '8081' || url.hostname.includes('api.openai.com') || url.hostname.includes('anthropic.com') ||
+        url.hostname.includes('jsdelivr.net') || url.hostname.includes('esm.run') || url.hostname.includes('huggingface.co') || url.hostname.includes('mlc.ai')) {
         return;
     }
 

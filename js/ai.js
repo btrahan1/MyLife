@@ -7,6 +7,12 @@
 class LifeAI {
     constructor() {
         this.isStreaming = false;
+        this.webllmEngine = null;
+        this.webllmLoading = false;
+    }
+
+    hasWebGPU() {
+        return typeof navigator !== 'undefined' && !!navigator.gpu;
     }
 
     // --- On-Device Briefing Calculator (0% AI / 100% Instant) ---
@@ -97,6 +103,10 @@ class LifeAI {
 
         if (mode === 'offline') {
             return this._runOfflineRuleEngine(prompt);
+        }
+
+        if (mode === 'webllm') {
+            return this._callWebLLM(prompt, onChunk);
         }
 
         if (mode === 'nano') {
@@ -206,6 +216,85 @@ INSTRUCTIONS:
         } catch (err) {
             console.warn('AI call failed, falling back to on-device engine:', err);
             return `*Note: Unable to reach ${endpoint} (${err.message}). Serving from on-device engine:*\n\n` + this._runOfflineRuleEngine(prompt);
+        }
+    }
+
+    // --- WebLLM (In-Browser WebGPU LLM on Phone / PC) ---
+
+    async _callWebLLM(prompt, onChunk) {
+        if (!this.hasWebGPU()) {
+            return `⚠️ **WebGPU is not available in this browser.**\n\n` +
+                   `WebLLM requires WebGPU support:\n` +
+                   `• **On PC:** Make sure "Hardware Acceleration" is enabled in Chrome Settings (\`chrome://settings/system\`).\n` +
+                   `• **On Android:** Make sure you are using modern Chrome on Android 12+.\n\n` +
+                   `Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
+        }
+
+        const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+
+        if (!this.webllmEngine) {
+            if (this.webllmLoading) {
+                return `⏳ WebLLM is currently initializing in the background. Please try again in a few seconds...`;
+            }
+
+            this.webllmLoading = true;
+            try {
+                if (onChunk) onChunk(`🌐 Loading WebLLM runtime into browser...`);
+                const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+
+                if (onChunk) onChunk(`🧠 Initializing ${model} on device GPU... (Checking cache / downloading weights)`);
+
+                this.webllmEngine = await webllm.CreateMLCEngine(model, {
+                    initProgressCallback: (report) => {
+                        if (onChunk && report.text) {
+                            onChunk(`🧠 ${report.text}`);
+                        }
+                    }
+                });
+                this.webllmLoading = false;
+            } catch (err) {
+                this.webllmLoading = false;
+                console.error("WebLLM load error:", err);
+                return `⚠️ Failed to initialize WebLLM (${err.message}). Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
+            }
+        }
+
+        const contextJson = window.db.getFullContextJson();
+        const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal life assistant running directly inside the user's browser GPU via WebLLM.
+All data is stored in the user's private SQLite vault on this device.
+CURRENT LIFE CONTEXT DATA:
+\`\`\`json
+${contextJson}
+\`\`\`
+INSTRUCTIONS:
+- Answer clearly, concisely, and supportively.
+- Use clear Markdown formatting with bullet points and bold text.
+- Reference facts and accurately calculate totals and upcoming dates from the data.`;
+
+        try {
+            if (onChunk) onChunk(""); // clear loading message before streaming answer
+            const chunks = await this.webllmEngine.chat.completions.create({
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.3,
+                max_tokens: 1024,
+                stream: true
+            });
+
+            let fullText = "";
+            for await (const chunk of chunks) {
+                const delta = chunk.choices[0]?.delta?.content || "";
+                if (delta) {
+                    fullText += delta;
+                    if (onChunk) onChunk(delta);
+                }
+            }
+            return fullText.trim() || "(No response generated.)";
+        } catch (err) {
+            console.error("WebLLM generation error:", err);
+            return `⚠️ WebLLM generation error: ${err.message}. Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
     }
 
