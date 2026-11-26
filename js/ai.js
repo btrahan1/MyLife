@@ -89,7 +89,7 @@ class LifeAI {
     // --- Co-Pilot Dispatcher ---
 
     async askCoPilot(prompt, onChunk = null) {
-        const mode = window.db.getSetting('ai_mode', 'offline');
+        const mode = window.db.getSetting('ai_mode', 'local');
 
         if (mode === 'disabled') {
             return "AI Co-Pilot is in Offline/Disabled mode. Enable Local Qwen or Cloud AI in Settings anytime!";
@@ -99,9 +99,14 @@ class LifeAI {
             return this._runOfflineRuleEngine(prompt);
         }
 
-        const endpoint = mode === 'local'
-            ? window.db.getSetting('local_endpoint', 'http://127.0.0.1:8081/v1') + '/chat/completions'
+        let endpoint = mode === 'local'
+            ? window.db.getSetting('local_endpoint', '/api/llm/v1') + '/chat/completions'
             : window.db.getSetting('cloud_endpoint', 'https://api.openai.com/v1') + '/chat/completions';
+
+        // Auto-route through local dev server proxy to prevent browser CORS block
+        if (mode === 'local' && endpoint.includes('127.0.0.1:8081')) {
+            endpoint = endpoint.replace('http://127.0.0.1:8081', '/api/llm');
+        }
 
         const apiKey = window.db.getSetting('cloud_api_key', '');
         const model = mode === 'local' ? 'qwen3.8-27b' : window.db.getSetting('cloud_model', 'gpt-4o-mini');
@@ -200,12 +205,15 @@ INSTRUCTIONS:
         const lower = prompt.toLowerCase();
         const briefing = this.generateBriefing();
 
-        if (lower.includes('bill') || lower.includes('subscription') || lower.includes('pay')) {
+        if (lower.includes('bill') || lower.includes('subscription') || lower.includes('pay') || lower.includes('cost') || lower.includes('total')) {
             if (briefing.upcomingBills.length === 0) {
                 return `🎉 **Great news!** You have no bills due in the next 10 days. Total monthly recurring is **$${briefing.totalMonthlyRecurring}**.`;
             }
+            const sumUpcoming = briefing.upcomingBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
             const list = briefing.upcomingBills.map(b => `- **${b.name}**: $${Number(b.amount).toFixed(2)} (Due: **${b.next_billing_date}**)`).join('\n');
-            return `💳 **Upcoming Bills (Next 10 Days):**\n\n${list}\n\n*Total Monthly Recurring Expenses:* **$${briefing.totalMonthlyRecurring}**`;
+            return `💳 **Upcoming Bills Breakdown (Next 10 Days):**\n\n${list}\n\n` +
+                   `💵 **Sum of Listed Upcoming Bills:** **$${sumUpcoming.toFixed(2)}**\n` +
+                   `📅 **Total Monthly Recurring Subscriptions:** **$${briefing.totalMonthlyRecurring}**`;
         }
 
         if (lower.includes('health') || lower.includes('refill') || lower.includes('prescription') || lower.includes('med')) {

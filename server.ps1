@@ -36,6 +36,58 @@ while ($Listener.IsListening) {
         $res.Headers.Add("Cross-Origin-Opener-Policy", "same-origin")
         $res.Headers.Add("Cross-Origin-Embedder-Policy", "require-corp")
         $res.Headers.Add("Access-Control-Allow-Origin", "*")
+        $res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE")
+        $res.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, *")
+
+        # Handle CORS preflight immediately
+        if ($req.HttpMethod -eq "OPTIONS") {
+            $res.StatusCode = 200
+            $res.Close()
+            continue
+        }
+
+        # Transparent LLM Proxy to local llama-server on port 8081
+        if ($path.StartsWith("/api/llm/")) {
+            $subPath = $path.Substring(8)
+            $targetUrl = "http://127.0.0.1:8081$subPath"
+            $fwdReq = [System.Net.HttpWebRequest]::Create($targetUrl)
+            $fwdReq.Method = $req.HttpMethod
+            $fwdReq.ContentType = if ($req.ContentType) { $req.ContentType } else { "application/json" }
+            $fwdReq.Timeout = 120000
+
+            if ($req.HasEntityBody) {
+                $reqStream = $req.InputStream
+                $fwdStream = $fwdReq.GetRequestStream()
+                $reqStream.CopyTo($fwdStream)
+                $fwdStream.Close()
+            }
+
+            try {
+                $fwdRes = $fwdReq.GetResponse()
+                $res.StatusCode = [int]$fwdRes.StatusCode
+                $res.ContentType = $fwdRes.ContentType
+                $resStream = $fwdRes.GetResponseStream()
+
+                $buf = New-Object byte[] 4096
+                while (($bytesRead = $resStream.Read($buf, 0, $buf.Length)) -gt 0) {
+                    $res.OutputStream.Write($buf, 0, $bytesRead)
+                    $res.OutputStream.Flush()
+                }
+                $fwdRes.Close()
+            } catch [System.Net.WebException] {
+                $errRes = $_.Exception.Response
+                if ($errRes) {
+                    $res.StatusCode = [int]$errRes.StatusCode
+                    $errStream = $errRes.GetResponseStream()
+                    $errStream.CopyTo($res.OutputStream)
+                    $errRes.Close()
+                } else {
+                    $res.StatusCode = 502
+                }
+            }
+            $res.Close()
+            continue
+        }
 
         if ([System.IO.File]::Exists($localFile)) {
             $ext = [System.IO.Path]::GetExtension($localFile).ToLower()

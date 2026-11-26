@@ -250,8 +250,8 @@ class LifeDatabase {
         this.run(`
             INSERT OR REPLACE INTO settings (key, value) VALUES
             ('user_name', 'Bart'),
-            ('ai_mode', 'offline'),
-            ('local_endpoint', 'http://127.0.0.1:8081/v1'),
+            ('ai_mode', 'local'),
+            ('local_endpoint', '/api/llm/v1'),
             ('cloud_endpoint', 'https://api.openai.com/v1'),
             ('cloud_model', 'gpt-4o-mini'),
             ('cloud_api_key', '');
