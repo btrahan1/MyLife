@@ -103,9 +103,10 @@ class LifeAI {
             ? window.db.getSetting('local_endpoint', '/api/llm/v1') + '/chat/completions'
             : window.db.getSetting('cloud_endpoint', 'https://api.openai.com/v1') + '/chat/completions';
 
-        // Auto-route through local dev server proxy to prevent browser CORS block
-        if (mode === 'local' && endpoint.includes('127.0.0.1:8081')) {
-            endpoint = endpoint.replace('http://127.0.0.1:8081', '/api/llm');
+        // Detect GitHub Pages static hosting
+        const isStaticHost = window.location.hostname.includes('github.io');
+        if (mode === 'local' && isStaticHost && endpoint.startsWith('/')) {
+            return `📡 **Local Qwen 27B is running on your GMKtec machine, not in the cloud.**\n\nGitHub Pages hosts this PWA statically, but cannot run your 27B GGUF model.\n\n**Options:**\n• **On your PC / home Wi-Fi:** Open MyLife at \`http://127.0.0.1:5050\` (or your GMKtec IP:5050) to use full 27B Qwen power.\n• **On GitHub Pages:** Tap the **📦 Offline Rules** chip above for instant private on-device processing, or set up **☁️ Cloud AI** in Settings.`;
         }
 
         const apiKey = window.db.getSetting('cloud_api_key', '');

@@ -110,9 +110,10 @@ const App = {
     },
 
     async loadDashboard() {
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const currentAiMode = window.db.getSetting('ai_mode');
-        if (!currentAiMode || currentAiMode === 'offline') {
-            window.db.setSetting('ai_mode', 'local');
+        if (!currentAiMode) {
+            window.db.setSetting('ai_mode', isLocalHost ? 'local' : 'offline');
         }
         this.updateCopilotModeUI();
 
