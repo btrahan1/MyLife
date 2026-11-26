@@ -107,6 +107,11 @@ class LifeAI {
             ? window.db.getSetting('local_endpoint', '/api/llm/v1') + '/chat/completions'
             : window.db.getSetting('cloud_endpoint', 'https://api.openai.com/v1') + '/chat/completions';
 
+        // If loaded directly from llama-server on LAN (e.g. port 8081)
+        if (mode === 'local' && window.location.port === '8081') {
+            endpoint = '/v1/chat/completions';
+        }
+
         // Detect GitHub Pages static hosting
         const isStaticHost = window.location.hostname.includes('github.io');
         if (mode === 'local' && isStaticHost && endpoint.startsWith('/')) {

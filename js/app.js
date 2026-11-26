@@ -46,7 +46,11 @@ const App = {
     switchTab(tab) {
         this.currentTab = tab;
         document.querySelectorAll('.nav-btn').forEach(b => {
-            b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+            const isActive = b.getAttribute('data-tab') === tab;
+            b.classList.toggle('active', isActive);
+            if (isActive && window.innerWidth <= 768) {
+                b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
         });
 
         document.querySelectorAll('.tab-pane').forEach(p => {
