@@ -368,7 +368,11 @@
                                     <p class="copilot-sub" id="copilotModeIndicator">Context: 100% Private SQLite Vault</p>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 8px;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 20px; border: 1px solid var(--border-color);">
+                                    <button class="btn-mode-chip active" id="chipLocal" onclick="App.setAiMode('local')">⚡ Local Qwen</button>
+                                    <button class="btn-mode-chip" id="chipOffline" onclick="App.setAiMode('offline')">📦 Offline Rules</button>
+                                </div>
                                 <button class="btn btn-sm btn-ghost" onclick="App.clearCopilotChat()">Clear</button>
                             </div>
                         </div>

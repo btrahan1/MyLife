@@ -106,6 +106,12 @@ const App = {
     },
 
     async loadDashboard() {
+        const currentAiMode = window.db.getSetting('ai_mode');
+        if (!currentAiMode || currentAiMode === 'offline') {
+            window.db.setSetting('ai_mode', 'local');
+        }
+        this.updateCopilotModeUI();
+
         this.renderBriefing();
         this.renderFinances();
         this.renderHealth();
@@ -115,6 +121,37 @@ const App = {
         this.renderVoiceNotes();
         this.renderFamily();
         this.populateSettings();
+    },
+
+    setAiMode(mode) {
+        window.db.setSetting('ai_mode', mode);
+        this.updateCopilotModeUI();
+        this.populateSettings();
+    },
+
+    updateCopilotModeUI() {
+        const mode = window.db.getSetting('ai_mode', 'local');
+        const indicator = document.getElementById('copilotModeIndicator');
+        const chipLocal = document.getElementById('chipLocal');
+        const chipOffline = document.getElementById('chipOffline');
+
+        if (chipLocal && chipOffline) {
+            chipLocal.classList.toggle('active', mode === 'local');
+            chipOffline.classList.toggle('active', mode === 'offline');
+        }
+
+        if (indicator) {
+            if (mode === 'local') {
+                indicator.innerText = 'Engine: ⚡ Local Qwen 27B (port 8081)';
+                indicator.style.color = 'var(--accent-cyan)';
+            } else if (mode === 'cloud') {
+                indicator.innerText = 'Engine: ☁️ Cloud AI';
+                indicator.style.color = 'var(--accent-purple)';
+            } else {
+                indicator.innerText = 'Engine: 📦 Offline Rule Engine';
+                indicator.style.color = 'var(--accent-amber)';
+            }
+        }
     },
 
     // --- 1. Briefing Rendering ---
