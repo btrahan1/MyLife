@@ -580,16 +580,86 @@ ${text}
         return null;
     }
 
+    _extractFinancialStatement(text) {
+        if (!text) return null;
+        const isStatement = /(?:New Balance|Statement Balance|Account Balance|Payment Due Date|Minimum Payment|Credit Line|Billing Cycle|Total Due|Purchases and Adjustments)/i.test(text);
+        if (!isStatement) return null;
+
+        // Institution
+        const instMatch = text.match(/\b(Bank of America|Chase|American Express|Amex|Capital One|Citibank|Citi|Discover|Wells Fargo|US Bank|Barclays|Fidelity|Vanguard|PNC|TD Bank|Charles Schwab|Navy Federal|USAA)\b/i);
+        const institution = instMatch ? instMatch[1] : '';
+
+        // Card Brand / Product
+        const cardMatch = text.match(/\b(Visa Signature|Visa Platinum|Visa Infinite|Visa|Mastercard|World Elite Mastercard|American Express|Discover)\b/i);
+        const cardBrand = cardMatch ? cardMatch[1] : 'Credit Card';
+
+        // Last 4 digits of account
+        const acctNumMatch = text.match(/(?:Account\s*(?:#|Number)?[\s:]*)(?:[0-9\s]{8,})?([0-9]{4})\b/i);
+        const last4 = acctNumMatch ? acctNumMatch[1] : '';
+
+        // Balance (New Balance Total / Statement Balance)
+        const balanceMatch = text.match(/(?:New Balance Total|New Balance|Statement Balance|Account Balance|Total Balance)[\s\S]{0,40}?\$\s*([0-9,]+\.[0-9]{2})/i);
+        const balance = balanceMatch ? parseFloat(balanceMatch[1].replace(/,/g, '')) : null;
+
+        // Minimum Payment Due
+        const minPayMatch = text.match(/(?:Total Minimum Payment Due|Minimum Payment Due|Current Payment Due|Minimum Payment)[\s\S]{0,40}?\$\s*([0-9,]+\.[0-9]{2})/i);
+        const minPayment = minPayMatch ? parseFloat(minPayMatch[1].replace(/,/g, '')) : null;
+
+        // Payment Due Date
+        const dueDateMatch = text.match(/(?:Payment Due Date|Due Date)[\s\S]{0,40}?([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i);
+        let dueDate = null;
+        if (dueDateMatch) {
+            const parts = dueDateMatch[1].split(/[\/\-]/);
+            const m = parts[0].padStart(2, '0');
+            const d = parts[1].padStart(2, '0');
+            let y = parts[2];
+            if (y.length === 2) y = '20' + y;
+            dueDate = `${y}-${m}-${d}`;
+        }
+
+        // Credit Line
+        const creditLineMatch = text.match(/(?:Total Credit Line|Credit Limit)[\s\S]{0,40}?\$\s*([0-9,]+\.[0-9]{2})/i);
+        const creditLine = creditLineMatch ? parseFloat(creditLineMatch[1].replace(/,/g, '')) : null;
+
+        return {
+            isStatement: true,
+            institution,
+            cardBrand,
+            last4,
+            balance,
+            minPayment,
+            dueDate,
+            creditLine
+        };
+    }
+
     _extractFieldsOffline(text, targetType) {
         if (!text) return {};
         const res = {};
         const date = this._parseFlexibleDate(text);
+        const stmt = this._extractFinancialStatement(text);
 
         // Dollar amount
         const amountMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)|\b(\d+\.\d{2})\b|\b(\d+)\s*(?:dollars?|bucks)/i);
         const amountVal = amountMatch ? parseFloat(amountMatch[1] || amountMatch[2] || amountMatch[3]) : null;
 
         if (targetType === 'subscription') {
+            // Priority 1: Financial / Credit Card Statement
+            if (stmt && stmt.isStatement) {
+                res.name = `${stmt.institution || 'Credit Card'} Card${stmt.last4 ? ' (…' + stmt.last4 + ')' : ''}`;
+                if (stmt.balance !== null) res.amount = stmt.balance;
+                else if (stmt.minPayment !== null) res.amount = stmt.minPayment;
+                res.cadence = 'Monthly';
+                res.category = 'Shopping';
+                if (stmt.dueDate) res.nextBillingDate = stmt.dueDate;
+                const notes = [];
+                if (stmt.balance !== null) notes.push(`Statement Balance: $${stmt.balance.toFixed(2)}`);
+                if (stmt.minPayment !== null) notes.push(`Min Due: $${stmt.minPayment.toFixed(2)}`);
+                if (stmt.creditLine !== null) notes.push(`Limit: $${stmt.creditLine.toLocaleString()}`);
+                res.notes = notes.join(' | ');
+                return res;
+            }
+
             if (amountVal !== null) res.amount = amountVal;
             if (date) res.nextBillingDate = date;
 
@@ -612,6 +682,16 @@ ${text}
         }
 
         if (targetType === 'account') {
+            // Priority 1: Financial / Credit Card Statement
+            if (stmt && stmt.isStatement) {
+                if (stmt.balance !== null) res.balance = stmt.balance;
+                res.accountType = 'Credit Card';
+                if (stmt.institution) res.institution = stmt.institution;
+                const brand = stmt.institution ? `${stmt.institution} ${stmt.cardBrand}` : stmt.cardBrand;
+                res.name = `${brand}${stmt.last4 ? ' (…' + stmt.last4 + ')' : ''}`;
+                return res;
+            }
+
             if (amountVal !== null) res.balance = amountVal;
 
             if (/checking/i.test(text)) res.accountType = 'Checking';

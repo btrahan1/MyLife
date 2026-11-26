@@ -114,6 +114,8 @@ const App = {
         if (window.voice && window.voice.isListening) {
             window.voice.stopListening();
         }
+        this._lastExtractedText = null;
+        this._lastSourceName = null;
     },
 
     switchModalTab(type) {
@@ -128,6 +130,11 @@ const App = {
         const formId = 'form' + type.charAt(0).toUpperCase() + type.slice(1);
         const formEl = document.getElementById(formId);
         if (formEl) formEl.classList.add('active');
+
+        // If a document or voice input was recently extracted, auto-fill this tab too!
+        if (this._lastExtractedText) {
+            this.autoFillFromText(this._lastExtractedText, this._lastSourceName || 'Document');
+        }
     },
 
     initSmartInput() {
@@ -239,7 +246,27 @@ const App = {
     async processInputFile(file, sourceName) {
         if (!file) return;
 
-        if (file.type.startsWith('image/')) {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const isImage = file.type.startsWith('image/');
+
+        if (isPdf) {
+            this.showSmartStatus(`📄 Reading ${file.name} (PDF)...`, true);
+            try {
+                const text = await this.extractTextFromPdf(file, (msg) => {
+                    this.showSmartStatus(`📄 ${msg}`, true);
+                });
+                if (!text || !text.trim()) {
+                    this.showSmartStatus(`⚠️ No text detected in PDF.`, false);
+                    return;
+                }
+                this._lastExtractedText = text.trim();
+                this._lastSourceName = `${sourceName} (${file.name})`;
+                await this.autoFillFromText(text.trim(), this._lastSourceName);
+            } catch (err) {
+                console.error('PDF Read Error:', err);
+                this.showSmartStatus(`⚠️ PDF parse error: ${err.message}`, false);
+            }
+        } else if (isImage) {
             this.showSmartStatus(`📷 Scanning image with OCR...`, true);
             try {
                 const text = await this.extractTextFromImage(file, (msg) => {
@@ -249,7 +276,9 @@ const App = {
                     this.showSmartStatus(`⚠️ No text detected in image. Please try another photo or dictate with voice.`, false);
                     return;
                 }
-                await this.autoFillFromText(text.trim(), `${sourceName} (OCR)`);
+                this._lastExtractedText = text.trim();
+                this._lastSourceName = `${sourceName} (OCR)`;
+                await this.autoFillFromText(text.trim(), this._lastSourceName);
             } catch (err) {
                 console.error('OCR Error:', err);
                 this.showSmartStatus(`⚠️ OCR scan error: ${err.message}`, false);
@@ -262,6 +291,8 @@ const App = {
                 reader.onload = async () => {
                     const text = reader.result;
                     if (text && text.trim()) {
+                        this._lastExtractedText = text.trim();
+                        this._lastSourceName = sourceName;
                         await this.autoFillFromText(text.trim(), sourceName);
                     }
                 };
@@ -270,6 +301,38 @@ const App = {
                 this.showSmartStatus(`⚠️ Failed to read file: ${err.message}`, false);
             }
         }
+    },
+
+    async extractTextFromPdf(file, onProgress) {
+        if (!window.pdfjsLib) {
+            if (onProgress) onProgress('Initializing PDF engine...');
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'vendor/pdf.min.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Failed to load local PDF parser.'));
+                document.head.appendChild(script);
+            });
+        }
+
+        if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+
+        let fullText = '';
+        const numPages = Math.min(pdf.numPages, 4); // First 4 pages contain summary and transactions
+        for (let i = 1; i <= numPages; i++) {
+            if (onProgress) onProgress(`Reading PDF page ${i} of ${numPages}...`);
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n\n';
+        }
+        return fullText;
     },
 
     async extractTextFromImage(file, onProgress) {

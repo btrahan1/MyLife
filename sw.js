@@ -2,7 +2,7 @@
  * MyLife PWA Service Worker (Offline Cache & Background Sync)
  */
 
-const CACHE_NAME = 'mylife-v1.2.0';
+const CACHE_NAME = 'mylife-v1.3.0';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -16,6 +16,8 @@ const STATIC_ASSETS = [
     './coi-serviceworker.js',
     './vendor/sql-wasm.js',
     './vendor/sql-wasm.wasm',
+    './vendor/pdf.min.js',
+    './vendor/pdf.worker.min.js',
     './icons/icon.svg',
     './icons/icon-192.png',
     './icons/icon-512.png'
