@@ -1,13 +1,17 @@
-# Simple local static development server for MyLife PWA
+# Simple local static development server & LLM proxy for MyLife PWA
 param([int]$Port = 5050)
+
+Add-Type -AssemblyName System.Net.Http
 
 $Root = $PSScriptRoot
 $Listener = New-Object System.Net.HttpListener
 $Listener.Prefixes.Add("http://127.0.0.1:$Port/")
 $Listener.Start()
 
-Write-Host "MyLife PWA Server running at http://127.0.0.1:$Port/"
-Write-Host "Local network access: http://$((Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike '*Loopback*' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress):$Port/"
+Write-Host "======================================================"
+Write-Host "  MyLife PWA Server running at http://127.0.0.1:$Port/"
+Write-Host "  LLM Proxy: http://127.0.0.1:$Port/api/llm/ -> http://127.0.0.1:8081/"
+Write-Host "======================================================"
 Write-Host "Press Ctrl+C to stop."
 
 $mimeTypes = @{
@@ -20,7 +24,11 @@ $mimeTypes = @{
     ".png"  = "image/png"
 }
 
+$httpClient = New-Object System.Net.Http.HttpClient
+$httpClient.Timeout = [TimeSpan]::FromMinutes(5)
+
 while ($Listener.IsListening) {
+    $Context = $null
     try {
         $Context = $Listener.GetContext()
         $req = $Context.Request
@@ -29,9 +37,7 @@ while ($Listener.IsListening) {
         $path = $req.Url.LocalPath
         if ($path -eq "/" -or $path -eq "") { $path = "/index.html" }
 
-        $localFile = [System.IO.Path]::Combine($Root, $path.TrimStart('/').Replace('/', [System.IO.Path]::DirectorySeparatorChar))
-
-        # Add Cross-Origin Isolation headers for SharedArrayBuffer / OPFS
+        # Always add Cross-Origin Isolation headers for SharedArrayBuffer / OPFS SQLite
         $res.Headers.Add("Cross-Origin-Opener-Policy", "same-origin")
         $res.Headers.Add("Cross-Origin-Embedder-Policy", "require-corp")
         $res.Headers.Add("Access-Control-Allow-Origin", "*")
@@ -41,7 +47,6 @@ while ($Listener.IsListening) {
         # Handle CORS preflight immediately
         if ($req.HttpMethod -eq "OPTIONS") {
             $res.StatusCode = 200
-            $res.Close()
             continue
         }
 
@@ -49,44 +54,47 @@ while ($Listener.IsListening) {
         if ($path.StartsWith("/api/llm/")) {
             $subPath = $path.Substring(8)
             $targetUrl = "http://127.0.0.1:8081$subPath"
-            $fwdReq = [System.Net.HttpWebRequest]::Create($targetUrl)
-            $fwdReq.Method = $req.HttpMethod
-            $fwdReq.ContentType = if ($req.ContentType) { $req.ContentType } else { "application/json" }
-            $fwdReq.Timeout = 120000
+
+            $httpMethod = [System.Net.Http.HttpMethod]::new($req.HttpMethod)
+            $httpReq = [System.Net.Http.HttpRequestMessage]::new($httpMethod, $targetUrl)
 
             if ($req.HasEntityBody) {
-                $reqStream = $req.InputStream
-                $fwdStream = $fwdReq.GetRequestStream()
-                $reqStream.CopyTo($fwdStream)
-                $fwdStream.Close()
+                $ms = New-Object System.IO.MemoryStream
+                $req.InputStream.CopyTo($ms)
+                $bodyBytes = $ms.ToArray()
+                $ms.Dispose()
+
+                $httpReq.Content = [System.Net.Http.ByteArrayContent]::new($bodyBytes)
+                if ($req.ContentType) {
+                    $httpReq.Content.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse($req.ContentType)
+                }
             }
 
             try {
-                $fwdRes = $fwdReq.GetResponse()
-                $res.StatusCode = [int]$fwdRes.StatusCode
-                $res.ContentType = $fwdRes.ContentType
-                $resStream = $fwdRes.GetResponseStream()
+                $httpRes = $httpClient.SendAsync($httpReq, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+                $res.StatusCode = [int]$httpRes.StatusCode
+                if ($httpRes.Content.Headers.ContentType) {
+                    $res.ContentType = $httpRes.Content.Headers.ContentType.ToString()
+                }
 
+                $stream = $httpRes.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
                 $buf = New-Object byte[] 4096
-                while (($bytesRead = $resStream.Read($buf, 0, $buf.Length)) -gt 0) {
-                    $res.OutputStream.Write($buf, 0, $bytesRead)
+                while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) {
+                    $res.OutputStream.Write($buf, 0, $n)
                     $res.OutputStream.Flush()
                 }
-                $fwdRes.Close()
-            } catch [System.Net.WebException] {
-                $errRes = $_.Exception.Response
-                if ($errRes) {
-                    $res.StatusCode = [int]$errRes.StatusCode
-                    $errStream = $errRes.GetResponseStream()
-                    $errStream.CopyTo($res.OutputStream)
-                    $errRes.Close()
-                } else {
-                    $res.StatusCode = 502
-                }
+                $stream.Close()
+                $httpRes.Dispose()
+            } catch {
+                $res.StatusCode = 502
+                $errMsg = [System.Text.Encoding]::UTF8.GetBytes("Cannot connect to local LLM server on port 8081. Verify llama-server is running.")
+                $res.OutputStream.Write($errMsg, 0, $errMsg.Length)
             }
-            $res.Close()
             continue
         }
+
+        # Static file delivery
+        $localFile = [System.IO.Path]::Combine($Root, $path.TrimStart('/').Replace('/', [System.IO.Path]::DirectorySeparatorChar))
 
         if ([System.IO.File]::Exists($localFile)) {
             $ext = [System.IO.Path]::GetExtension($localFile).ToLower()
@@ -103,8 +111,11 @@ while ($Listener.IsListening) {
             $errBytes = [System.Text.Encoding]::UTF8.GetBytes("File Not Found")
             $res.OutputStream.Write($errBytes, 0, $errBytes.Length)
         }
-        $res.Close()
     } catch {
         Write-Host "Request error: $_"
+    } finally {
+        if ($Context -and $Context.Response) {
+            try { $Context.Response.Close() } catch {}
+        }
     }
 }

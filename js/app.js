@@ -53,6 +53,10 @@ const App = {
             p.classList.toggle('active', p.id === `tab-${tab}`);
         });
 
+        // Reset scroll position to top of page when changing tabs
+        const vp = document.getElementById('contentViewport');
+        if (vp) vp.scrollTop = 0;
+
         // Re-render target tab if needed
         if (tab === 'shopping') this.renderShopping();
         if (tab === 'voice') this.renderVoiceNotes();

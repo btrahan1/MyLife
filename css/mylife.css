@@ -26,6 +26,25 @@
     --font-mono: 'JetBrains Mono', Consolas, monospace;
 }
 
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -595,7 +614,7 @@ tbody td {
 }
 
 /* Health RX Grid */
-.rx-grid, .milestones-grid, .maintenance-grid {
+.rx-grid, .milestones-grid, .maintenance-grid, .maint-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
