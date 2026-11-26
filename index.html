@@ -231,6 +231,42 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Statement Transactions Ledger & Category Breakdown -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                        <h2 class="subheading" style="margin: 0;">Statement Transactions &amp; Activity</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="txAccountFilter" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px;" onchange="App.filterTransactions()">
+                                <option value="">All Accounts</option>
+                            </select>
+                            <input type="text" id="txSearchInput" class="form-control" placeholder="Search transactions..." style="width: 180px; padding: 4px 10px; font-size: 12px;" oninput="App.filterTransactions()">
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body no-pad">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Merchant / Description</th>
+                                            <th>Category</th>
+                                            <th>Account</th>
+                                            <th style="text-align: right;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="txTableBody">
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                                No transactions imported yet. Drop a credit card or bank statement PDF/CSV to import!
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- 3. HEALTH & RX VIEW -->
@@ -788,6 +824,7 @@
     <script src="coi-serviceworker.js"></script>
     <script src="vendor/sql-wasm.js"></script>
     <script src="vendor/pdf.min.js"></script>
+    <script src="js/statementParser.js"></script>
     <script src="js/db.js"></script>
     <script src="js/voice.js"></script>
     <script src="js/ai.js"></script>

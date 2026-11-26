@@ -252,13 +252,27 @@ const App = {
         if (isPdf) {
             this.showSmartStatus(`📄 Reading ${file.name} (PDF)...`, true);
             try {
-                const text = await this.extractTextFromPdf(file, (msg) => {
-                    this.showSmartStatus(`📄 ${msg}`, true);
-                });
-                if (!text || !text.trim()) {
-                    this.showSmartStatus(`⚠️ No text detected in PDF.`, false);
+                await this.initPdfEngine();
+                const parsed = await window.StatementParser.parsePdfFile(file);
+
+                if (parsed.summary && parsed.summary.isStatement) {
+                    const ingest = window.StatementParser.ingestStatement(parsed, file.name);
+                    
+                    this.renderFinances();
+                    this.loadDashboard();
+
+                    let msg = ingest.isNewAccount
+                        ? `✨ Created ${ingest.accountName}: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and ${ingest.importedCount} transactions imported!`
+                        : `✨ ${ingest.accountName} updated: Balance $${Number(ingest.summary.balance).toFixed(2)}, due ${ingest.summary.dueDate}, and ${ingest.importedCount} new transactions!`;
+
+                    this.showSmartStatus(msg, false);
+                    this._lastExtractedText = parsed.rawText;
+                    this._lastSourceName = `${sourceName} (${file.name})`;
+                    await this.autoFillFromText(parsed.rawText, this._lastSourceName);
                     return;
                 }
+
+                const text = parsed.rawText || '';
                 this._lastExtractedText = text.trim();
                 this._lastSourceName = `${sourceName} (${file.name})`;
                 await this.autoFillFromText(text.trim(), this._lastSourceName);
@@ -303,9 +317,8 @@ const App = {
         }
     },
 
-    async extractTextFromPdf(file, onProgress) {
+    async initPdfEngine() {
         if (!window.pdfjsLib) {
-            if (onProgress) onProgress('Initializing PDF engine...');
             await new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = 'vendor/pdf.min.js';
@@ -314,10 +327,13 @@ const App = {
                 document.head.appendChild(script);
             });
         }
-
         if (window.pdfjsLib) {
             window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
         }
+    },
+
+    async extractTextFromPdf(file, onProgress) {
+        await this.initPdfEngine();
 
         const arrayBuffer = await file.arrayBuffer();
         const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
@@ -614,6 +630,75 @@ const App = {
                 </td>
             </tr>
         `).join('');
+
+        this.renderTransactions();
+    },
+
+    renderTransactions(filterAccountId = null, filterQuery = null) {
+        const txTbody = document.getElementById('txTableBody');
+        if (!txTbody) return;
+
+        const accounts = window.db.getAccounts();
+        const acctFilter = document.getElementById('txAccountFilter');
+        if (acctFilter && acctFilter.options.length <= 1) {
+            accounts.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.textContent = a.name;
+                acctFilter.appendChild(opt);
+            });
+        }
+
+        const selectedAccountId = filterAccountId !== null ? filterAccountId : (acctFilter ? acctFilter.value : null);
+        const searchInput = document.getElementById('txSearchInput');
+        const query = (filterQuery !== null ? filterQuery : (searchInput ? searchInput.value : '')).toLowerCase().trim();
+
+        let txList = window.db.getTransactions(selectedAccountId ? parseInt(selectedAccountId, 10) : null, 150);
+
+        if (query) {
+            txList = txList.filter(t => 
+                (t.clean_merchant && t.clean_merchant.toLowerCase().includes(query)) ||
+                (t.description && t.description.toLowerCase().includes(query)) ||
+                (t.category && t.category.toLowerCase().includes(query))
+            );
+        }
+
+        if (txList.length === 0) {
+            txTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                        ${query ? 'No transactions matching "' + this.escape(query) + '"' : 'No transactions imported yet. Drop a credit card or bank statement PDF to import!'}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        txTbody.innerHTML = txList.map(t => {
+            const isIncome = t.type === 'income';
+            const amountColor = isIncome ? '#34d399' : 'var(--text-primary)';
+            const amountPrefix = isIncome ? '+$' : '$';
+            return `
+                <tr>
+                    <td style="white-space: nowrap; font-size: 12px; color: var(--text-secondary);">${t.date}</td>
+                    <td>
+                        <strong style="color: var(--text-primary); font-size: 13px;">${this.escape(t.clean_merchant || t.description)}</strong>
+                        ${t.clean_merchant && t.clean_merchant !== t.description ? `<div style="font-size: 11px; color: var(--text-muted);">${this.escape(t.description)}</div>` : ''}
+                    </td>
+                    <td><span class="feed-badge badge-normal" style="font-size: 11px;">${this.escape(t.category || 'General')}</span></td>
+                    <td><span style="font-size: 11.5px; color: var(--text-secondary);">${this.escape(t.account_name || 'Card')}</span></td>
+                    <td style="text-align: right; font-weight: 700; color: ${amountColor}; font-size: 13.5px;">
+                        ${amountPrefix}${Number(t.amount).toFixed(2)}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    filterTransactions() {
+        const acctFilter = document.getElementById('txAccountFilter');
+        const searchInput = document.getElementById('txSearchInput');
+        this.renderTransactions(acctFilter ? acctFilter.value : null, searchInput ? searchInput.value : null);
     },
 
     // --- 3. Health Rendering ---

@@ -62,6 +62,20 @@ class LifeDatabase {
                 last_updated TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER,
+                date TEXT NOT NULL,
+                description TEXT NOT NULL,
+                clean_merchant TEXT,
+                category TEXT,
+                amount REAL NOT NULL,
+                type TEXT DEFAULT 'expense',
+                is_subscription INTEGER DEFAULT 0,
+                statement_source TEXT,
+                UNIQUE(account_id, date, amount, description) ON CONFLICT IGNORE
+            );
+
             CREATE TABLE IF NOT EXISTS subscriptions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -355,6 +369,155 @@ class LifeDatabase {
 
     getAccounts() {
         return this.query('SELECT * FROM accounts ORDER BY balance DESC');
+    }
+
+    getTransactions(accountId = null, limit = 100) {
+        if (accountId) {
+            return this.query(`
+                SELECT t.*, a.name AS account_name, a.institution AS account_institution
+                FROM transactions t
+                LEFT JOIN accounts a ON t.account_id = a.id
+                WHERE t.account_id = :aid
+                ORDER BY t.date DESC, t.id DESC
+                LIMIT :lim
+            `, { ':aid': accountId, ':lim': limit });
+        }
+        return this.query(`
+            SELECT t.*, a.name AS account_name, a.institution AS account_institution
+            FROM transactions t
+            LEFT JOIN accounts a ON t.account_id = a.id
+            ORDER BY t.date DESC, t.id DESC
+            LIMIT :lim
+        `, { ':lim': limit });
+    }
+
+    insertTransactions(txList, accountId, statementSource) {
+        let count = 0;
+        for (const tx of txList) {
+            try {
+                this.run(`
+                    INSERT OR IGNORE INTO transactions (account_id, date, description, clean_merchant, category, amount, type, is_subscription, statement_source)
+                    VALUES (:aid, :d, :desc, :clean, :cat, :amt, :type, :sub, :src)
+                `, {
+                    ':aid': accountId,
+                    ':d': tx.date,
+                    ':desc': tx.originalText || tx.description || '',
+                    ':clean': tx.cleanMerchant || tx.clean_merchant || tx.originalText || '',
+                    ':cat': tx.category || 'Miscellaneous',
+                    ':amt': Math.abs(tx.amount || 0),
+                    ':type': (tx.amount < 0 || tx.type === 'income') ? 'income' : 'expense',
+                    ':sub': tx.isSubscription ? 1 : 0,
+                    ':src': statementSource || 'Statement'
+                });
+                if (this.db.getRowsModified() > 0) count++;
+            } catch (e) {
+                console.warn('Error inserting transaction:', e);
+            }
+        }
+        this.saveToDisk();
+        return count;
+    }
+
+    findAccountByStatement(summary) {
+        if (!summary) return null;
+        const accounts = this.getAccounts();
+        const inst = (summary.institution || '').toLowerCase().trim();
+        const last4 = (summary.last4 || '').trim();
+
+        // 1. Exact match on last4 in account name
+        if (last4) {
+            const byLast4 = accounts.find(a => a.name.includes(last4) || (a.institution && a.institution.includes(last4)));
+            if (byLast4) return byLast4;
+        }
+
+        // 2. Match on institution name and Credit Card type
+        if (inst) {
+            const byInst = accounts.find(a => 
+                (a.institution && a.institution.toLowerCase().includes(inst)) ||
+                a.name.toLowerCase().includes(inst)
+            );
+            if (byInst) return byInst;
+        }
+
+        return null;
+    }
+
+    updateAccountBalance(accountId, balance, date) {
+        this.run(`
+            UPDATE accounts 
+            SET balance = :b, last_updated = :d 
+            WHERE id = :id
+        `, {
+            ':id': accountId,
+            ':b': balance,
+            ':d': date || new Date().toISOString().split('T')[0]
+        });
+        this.saveToDisk();
+    }
+
+    insertAccount(name, accountType, institution, balance) {
+        this.run(`
+            INSERT INTO accounts (name, account_type, institution, balance, last_updated)
+            VALUES (:n, :t, :i, :b, :d)
+        `, {
+            ':n': name,
+            ':t': accountType || 'Credit Card',
+            ':i': institution || '',
+            ':b': balance || 0,
+            ':d': new Date().toISOString().split('T')[0]
+        });
+        const lastId = this.query("SELECT last_insert_rowid() AS id")[0]?.id;
+        this.saveToDisk();
+        return lastId;
+    }
+
+    updateOrCreateCardBill(accountName, institution, last4, balance, dueDate, minPayment, creditLine) {
+        if (!dueDate && balance === null) return;
+        const subs = this.getSubscriptions();
+        const instLower = (institution || '').toLowerCase();
+        
+        let existing = null;
+        if (last4) {
+            existing = subs.find(s => s.name.includes(last4));
+        }
+        if (!existing && instLower) {
+            existing = subs.find(s => s.name.toLowerCase().includes(instLower));
+        }
+
+        const notesParts = [];
+        if (balance !== null) notesParts.push(`Statement Balance: $${balance.toFixed(2)}`);
+        if (minPayment !== null) notesParts.push(`Min Due: $${minPayment.toFixed(2)}`);
+        if (creditLine !== null) notesParts.push(`Limit: $${Number(creditLine).toLocaleString()}`);
+        const notesStr = notesParts.join(' | ');
+
+        const billAmount = balance !== null ? balance : (minPayment !== null ? minPayment : 0);
+        const targetDueDate = dueDate || new Date(Date.now() + 25 * 86400000).toISOString().split('T')[0];
+
+        if (existing) {
+            this.run(`
+                UPDATE subscriptions 
+                SET amount = :amt, next_billing_date = :d, notes = :notes, status = 'Active'
+                WHERE id = :id
+            `, {
+                ':id': existing.id,
+                ':amt': billAmount,
+                ':d': targetDueDate,
+                ':notes': notesStr || existing.notes
+            });
+        } else {
+            const brand = institution ? `${institution} Card` : 'Credit Card';
+            const billName = `${brand}${last4 ? ' (…' + last4 + ')' : ''}`;
+            this.run(`
+                INSERT INTO subscriptions (name, category, amount, cadence, next_billing_date, status, notes)
+                VALUES (:n, 'Credit Card', :amt, 'Monthly', :d, 'Active', :notes)
+            `, {
+                ':n': billName,
+                ':amt': billAmount,
+                ':d': targetDueDate,
+                ':notes': notesStr
+            });
+        }
+        this.saveToDisk();
     }
 
     getSubscriptions() {
