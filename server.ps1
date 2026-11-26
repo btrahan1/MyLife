@@ -4,7 +4,6 @@ param([int]$Port = 5050)
 $Root = $PSScriptRoot
 $Listener = New-Object System.Net.HttpListener
 $Listener.Prefixes.Add("http://127.0.0.1:$Port/")
-$Listener.Prefixes.Add("http://localhost:$Port/")
 $Listener.Start()
 
 Write-Host "MyLife PWA Server running at http://127.0.0.1:$Port/"
