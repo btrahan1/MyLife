@@ -15,6 +15,44 @@ class LifeAI {
         return typeof navigator !== 'undefined' && !!navigator.gpu;
     }
 
+    // Pre-warm WebLLM when user taps the chip so it's instantly ready
+    async prewarmWebLLM() {
+        if (!this.hasWebGPU() || this.webllmEngine || this.webllmLoading) return;
+        this.webllmLoading = true;
+        const indicator = document.getElementById('copilotModeIndicator');
+        if (indicator) {
+            indicator.innerText = "Engine: 🌐 In-Browser GPU (Loading model into VRAM...)";
+            indicator.style.color = "var(--accent-amber)";
+        }
+        try {
+            const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+            const model = window.db.getSetting('webllm_model', 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+            this.webllmEngine = await webllm.CreateMLCEngine(model, {
+                initProgressCallback: (report) => {
+                    if (indicator) {
+                        const pct = Math.round((report.progress || 0) * 100);
+                        const isCache = (report.text || '').toLowerCase().includes('cache');
+                        indicator.innerText = isCache
+                            ? `Engine: 🌐 Loading from local disk cache (${pct}%)...`
+                            : `Engine: 🌐 In-Browser GPU (${pct}%)...`;
+                    }
+                }
+            });
+            this.webllmLoading = false;
+            if (indicator) {
+                indicator.innerText = "Engine: 🌐 In-Browser GPU (Ready on GPU ⚡)";
+                indicator.style.color = "var(--accent-emerald)";
+            }
+        } catch (err) {
+            this.webllmLoading = false;
+            console.error("WebLLM prewarm error:", err);
+            if (indicator) {
+                indicator.innerText = `Engine: 🌐 WebLLM GPU Error: ${err.message}`;
+                indicator.style.color = "var(--accent-rose)";
+            }
+        }
+    }
+
     // --- On-Device Briefing Calculator (0% AI / 100% Instant) ---
 
     generateBriefing() {

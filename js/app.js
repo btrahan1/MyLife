@@ -136,6 +136,11 @@ const App = {
         window.db.setSetting('ai_mode', mode);
         this.updateCopilotModeUI();
         this.populateSettings();
+
+        // If user selects WebLLM, pre-warm model into GPU memory in background
+        if (mode === 'webllm' && window.ai?.prewarmWebLLM) {
+            window.ai.prewarmWebLLM();
+        }
     },
 
     updateCopilotModeUI() {
