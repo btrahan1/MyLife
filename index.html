@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MyLife — Personal Command Center</title>
+    
+    <!-- PWA & Mobile Meta -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#131722">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Fonts & CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/mylife.css">
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Top Header Navigation -->
+        <header class="top-nav">
+            <div class="nav-left">
+                <div class="brand">
+                    <span class="brand-icon">🛡️</span>
+                    <span class="brand-title">MyLife</span>
+                    <span class="brand-badge">PWA</span>
+                </div>
+                <div class="current-date-text" id="navDateText">Today</div>
+            </div>
+
+            <div class="nav-right">
+                <button class="btn btn-sm btn-ghost" id="btnVoiceHeader" title="Voice Assistant" onclick="App.triggerQuickVoice()">
+                    <span id="voiceHeaderIcon">🎙️</span> Voice
+                </button>
+                <div class="status-pill">
+                    <span style="font-size: 10px;">●</span>
+                    <span id="dbStatusBadge">SQLite Local</span>
+                </div>
+                <button class="btn btn-primary" id="btnQuickAdd">
+                    <span>+</span> Add
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Body -->
+        <div class="main-body">
+            <!-- Sidebar Navigation (Desktop) & Bottom Nav (Mobile) -->
+            <nav class="sidebar" id="mainSidebar">
+                <div class="nav-group">
+                    <button class="nav-btn active" data-tab="briefing">
+                        <span class="nav-icon">🌅</span>
+                        <span class="nav-label">Briefing</span>
+                    </button>
+                    <button class="nav-btn" data-tab="finances">
+                        <span class="nav-icon">💰</span>
+                        <span class="nav-label">Finances</span>
+                    </button>
+                    <button class="nav-btn" data-tab="health">
+                        <span class="nav-icon">🏥</span>
+                        <span class="nav-label">Health &amp; Rx</span>
+                    </button>
+                    <button class="nav-btn" data-tab="milestones">
+                        <span class="nav-icon">🎂</span>
+                        <span class="nav-label">Milestones</span>
+                    </button>
+                    <button class="nav-btn" data-tab="maintenance">
+                        <span class="nav-icon">🔧</span>
+                        <span class="nav-label">Maintenance</span>
+                    </button>
+                    <button class="nav-btn" data-tab="shopping">
+                        <span class="nav-icon">🛒</span>
+                        <span class="nav-label">Shopping</span>
+                    </button>
+                    <button class="nav-btn" data-tab="voice">
+                        <span class="nav-icon">🎙️</span>
+                        <span class="nav-label">Voice Notes</span>
+                    </button>
+                    <button class="nav-btn" data-tab="family">
+                        <span class="nav-icon">👨‍👩‍👧</span>
+                        <span class="nav-label">Family</span>
+                    </button>
+                    <button class="nav-btn" data-tab="copilot">
+                        <span class="nav-icon">🤖</span>
+                        <span class="nav-label">Co-Pilot</span>
+                    </button>
+                    <button class="nav-btn" data-tab="settings">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Settings</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="vault-info">
+                        <small>Local SQLite Vault</small>
+                        <span class="vault-status">🔒 100% On-Device</span>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main Content Area -->
+            <main class="content-viewport" id="contentViewport">
+                <!-- 1. BRIEFING VIEW -->
+                <section class="tab-pane active" id="tab-briefing">
+                    <div class="hero-briefing-card">
+                        <div class="hero-header">
+                            <div>
+                                <h1 class="hero-greeting" id="heroGreeting">Good morning!</h1>
+                                <p class="hero-subtitle" id="heroSub">Here is your life snapshot today.</p>
+                            </div>
+                            <div class="urgent-counter" id="heroUrgentBadge">
+                                <span class="urgent-num" id="heroUrgentNum">0</span>
+                                <span class="urgent-text">Actions Due</span>
+                            </div>
+                        </div>
+
+                        <div class="hero-stats-row">
+                            <div class="hero-stat-card">
+                                <span class="hero-stat-icon">💳</span>
+                                <div>
+                                    <span class="hero-stat-label">Bills (Next 10d)</span>
+                                    <strong class="hero-stat-val" id="statBillsDue">0</strong>
+                                </div>
+                            </div>
+                            <div class="hero-stat-card">
+                                <span class="hero-stat-icon">💊</span>
+                                <div>
+                                    <span class="hero-stat-label">Refills Needed</span>
+                                    <strong class="hero-stat-val" id="statRefillsDue">0</strong>
+                                </div>
+                            </div>
+                            <div class="hero-stat-card">
+                                <span class="hero-stat-icon">🎉</span>
+                                <div>
+                                    <span class="hero-stat-label">Milestones (14d)</span>
+                                    <strong class="hero-stat-val" id="statMilestonesDue">0</strong>
+                                </div>
+                            </div>
+                            <div class="hero-stat-card">
+                                <span class="hero-stat-icon">🛒</span>
+                                <div>
+                                    <span class="hero-stat-label">Shopping Items</span>
+                                    <strong class="hero-stat-val" id="statShoppingDue">0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-grid-2col">
+                        <!-- Upcoming Bills -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">💳 Upcoming Bills (Next 10 Days)</h2>
+                                <span class="card-badge" id="badgeBillsTotal">$0.00</span>
+                            </div>
+                            <div class="card-body no-pad">
+                                <div class="table-responsive">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Service</th>
+                                                <th>Amount</th>
+                                                <th>Due Date</th>
+                                                <th>Category</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="briefingBillsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Refills & Health -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">💊 Prescription Refills Due Soon</h2>
+                                <span class="card-badge" id="badgeRefillsCount">0 items</span>
+                            </div>
+                            <div class="card-body">
+                                <div id="briefingRefillsContainer" class="feed-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. FINANCES VIEW -->
+                <section class="tab-pane" id="tab-finances">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Finances &amp; Subscriptions</h1>
+                            <p class="section-subtitle">Real-time balances and recurring cash-flow.</p>
+                        </div>
+                        <div class="financial-summary-badge">
+                            <div>
+                                <small>Est. Net Worth</small>
+                                <strong id="finNetWorthDisplay">$0.00</strong>
+                            </div>
+                            <div style="border-left: 1px solid var(--border-color); padding-left: 14px;">
+                                <small>Monthly Recurring</small>
+                                <strong id="finRecurringDisplay" style="color: var(--accent-cyan);">$0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="subheading">Active Accounts</h2>
+                    <div class="accounts-grid" id="accountsGrid"></div>
+
+                    <h2 class="subheading" style="margin-top: 32px;">Recurring Subscriptions &amp; Bills</h2>
+                    <div class="card">
+                        <div class="card-body no-pad">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Category</th>
+                                            <th style="text-align: right;">Amount</th>
+                                            <th>Cadence</th>
+                                            <th>Next Bill</th>
+                                            <th>Status</th>
+                                            <th>Notes</th>
+                                            <th style="text-align: center;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. HEALTH & RX VIEW -->
+                <section class="tab-pane" id="tab-health">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Health, Medications &amp; Appointments</h1>
+                            <p class="section-subtitle">Private local prescription log and medical visits.</p>
+                        </div>
+                    </div>
+
+                    <h2 class="subheading">Active Prescriptions</h2>
+                    <div class="rx-grid" id="rxCardsGrid"></div>
+
+                    <h2 class="subheading" style="margin-top: 32px;">Medical Appointments</h2>
+                    <div class="card">
+                        <div class="card-body no-pad">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Provider</th>
+                                            <th>Specialty</th>
+                                            <th>Date &amp; Time</th>
+                                            <th>Location</th>
+                                            <th>Purpose</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="aptsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. MILESTONES VIEW -->
+                <section class="tab-pane" id="tab-milestones">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Milestones &amp; Anniversaries</h1>
+                            <p class="section-subtitle">Never forget a birthday, anniversary, or life event.</p>
+                        </div>
+                    </div>
+                    <div class="milestones-grid" id="milestonesGrid"></div>
+                </section>
+
+                <!-- 5. MAINTENANCE VIEW -->
+                <section class="tab-pane" id="tab-maintenance">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Vehicle &amp; Home Maintenance</h1>
+                            <p class="section-subtitle">Keep vehicles, HVAC, and household systems serviced.</p>
+                        </div>
+                    </div>
+                    <div class="maint-grid" id="maintGrid"></div>
+                </section>
+
+                <!-- 6. SHOPPING LIST VIEW (NEW!) -->
+                <section class="tab-pane" id="tab-shopping">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Shopping &amp; Groceries</h1>
+                            <p class="section-subtitle">Voice-enabled household checklist stored in SQLite.</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="App.clearCompletedShopping()">
+                            Clear Completed
+                        </button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="quickAddShoppingForm" onsubmit="App.handleQuickShoppingSubmit(event)" style="display: flex; gap: 10px;">
+                                <input type="text" id="inputShoppingTitle" class="form-control" placeholder="Add an item (e.g., Oat Milk, AA Batteries, Filter)..." required style="flex: 2;">
+                                <input type="text" id="inputShoppingQty" class="form-control" placeholder="Qty (e.g. 2 cartons)" style="flex: 1;">
+                                <select id="selectShoppingCategory" class="form-control" style="flex: 1;">
+                                    <option value="Groceries">Groceries</option>
+                                    <option value="Hardware">Hardware</option>
+                                    <option value="Pharmacy">Pharmacy</option>
+                                    <option value="Household">Household</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary">+ Add</button>
+                            </form>
+
+                            <div class="shopping-grid" id="shoppingItemsList"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 7. VOICE NOTES VIEW (NEW!) -->
+                <section class="tab-pane" id="tab-voice">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Voice Notes &amp; Memos</h1>
+                            <p class="section-subtitle">Hands-free voice recorder powered by browser Web Speech API.</p>
+                        </div>
+                    </div>
+
+                    <div class="voice-banner">
+                        <div>
+                            <h3 style="font-size: 16px; margin-bottom: 4px;">Tap Microphone to Record</h3>
+                            <p style="font-size: 13px; color: var(--text-secondary);" id="voiceStatusHint">Say: "Add to grocery list: Apples" or "Take note: Plumber said water heater pressure is 50 psi"</p>
+                        </div>
+                        <button class="btn-mic-pulse" id="btnBigMic" onclick="App.toggleVoiceRecording()">
+                            🎙️
+                        </button>
+                    </div>
+
+                    <div id="voiceNotesList"></div>
+                </section>
+
+                <!-- 8. FAMILY CIRCLE VIEW (NEW!) -->
+                <section class="tab-pane" id="tab-family">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Family Circle &amp; Emergency Contacts</h1>
+                            <p class="section-subtitle">Coordinate household info and emergency In-Case-of-Emergency (ICE) access.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="App.openAddModal('family')">
+                            + Add Member
+                        </button>
+                    </div>
+
+                    <div class="family-grid" id="familyGrid"></div>
+                </section>
+
+                <!-- 9. CO-PILOT VIEW -->
+                <section class="tab-pane" id="tab-copilot">
+                    <div class="copilot-container">
+                        <div class="copilot-header">
+                            <div class="copilot-title-group">
+                                <span class="copilot-avatar">🤖</span>
+                                <div>
+                                    <h2 class="copilot-title">MyLife Co-Pilot</h2>
+                                    <p class="copilot-sub" id="copilotModeIndicator">Context: 100% Private SQLite Vault</p>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm btn-ghost" onclick="App.clearCopilotChat()">Clear</button>
+                            </div>
+                        </div>
+
+                        <div class="copilot-transcript" id="copilotTranscript">
+                            <div class="chat-msg assistant">
+                                <div class="msg-avatar">🤖</div>
+                                <div class="msg-bubble">
+                                    <p>Hello! I am your <strong>MyLife Co-Pilot</strong>.</p>
+                                    <p style="margin-top: 6px;">I can analyze your balances, due bills, medications, maintenance, and shopping lists. Try tapping one of the quick prompts below or ask me anything:</p>
+                                    <div class="quick-prompts-row" style="margin-top: 10px;">
+                                        <button class="btn-prompt-chip" onclick="App.askQuickPrompt('What bills do I have due this week?')">💳 Bills due this week</button>
+                                        <button class="btn-prompt-chip" onclick="App.askQuickPrompt('Do I have any medication refills needed?')">💊 Refill status</button>
+                                        <button class="btn-prompt-chip" onclick="App.askQuickPrompt('What is my total estimated net worth?')">💰 Net worth</button>
+                                        <button class="btn-prompt-chip" onclick="App.askQuickPrompt('What items are on my shopping list?')">🛒 Shopping list</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="copilot-composer">
+                            <div class="composer-inner">
+                                <input type="text" id="copilotInput" class="composer-input" placeholder="Ask your Co-Pilot about your life vault..." autocomplete="off">
+                                <button class="btn btn-ghost" id="btnCopilotMic" title="Voice Dictate" onclick="App.toggleCopilotMic()" style="padding: 0 12px; font-size: 18px;">
+                                    🎙️
+                                </button>
+                                <button class="btn btn-primary" id="btnSendCopilot" onclick="App.sendCopilotMessage()">
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 10. SETTINGS VIEW -->
+                <section class="tab-pane" id="tab-settings">
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">Settings &amp; Vault Backup</h1>
+                            <p class="section-subtitle">Configure AI tiering, local endpoints, and export your database.</p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="max-width: 680px; margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h2 class="card-title">🤖 AI Co-Pilot Provider</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Select AI Engine Tier</label>
+                                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
+                                        <input type="radio" name="aiProvider" value="offline" id="aiModeOffline" checked>
+                                        <span><strong>On-Device Intelligent Rule Engine</strong> (100% Offline, Zero Server Required)</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
+                                        <input type="radio" name="aiProvider" value="local" id="aiModeLocal">
+                                        <span><strong>Local LLM (Home PC / Qwen 27B)</strong> — Connect to port 8081 or Tailscale IP</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
+                                        <input type="radio" name="aiProvider" value="cloud" id="aiModeCloud">
+                                        <span><strong>Cloud AI API</strong> (OpenAI, Claude, OpenRouter)</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer;">
+                                        <input type="radio" name="aiProvider" value="disabled" id="aiModeDisabled">
+                                        <span><strong>Disable AI Co-Pilot</strong> (Pure database mode)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label class="form-label">User Display Name</label>
+                                <input type="text" id="settingUserName" class="form-control" value="Bart">
+                            </div>
+
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label class="form-label">Local LLM Endpoint URL</label>
+                                <input type="text" id="settingLocalEndpoint" class="form-control" value="http://127.0.0.1:8081/v1">
+                                <small style="color: var(--text-muted); font-size: 12px;">When accessing from phone, use your PC's Wi-Fi IP (e.g., http://192.168.1.150:8081/v1) or Tailscale IP.</small>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label class="form-label">Cloud API Key (Optional)</label>
+                                <input type="password" id="settingCloudKey" class="form-control" placeholder="sk-...">
+                            </div>
+
+                            <button class="btn btn-primary" onclick="App.saveSettings()" style="margin-top: 18px;">
+                                Save Preferences
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Backup & Export -->
+                    <div class="card" style="max-width: 680px;">
+                        <div class="card-header">
+                            <h2 class="card-title">💾 Backup, Export &amp; Restore</h2>
+                        </div>
+                        <div class="card-body">
+                            <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 16px;">
+                                Your SQLite vault is 100% stored in your browser's persistent storage. You can download the genuine SQLite binary file anytime to open in desktop apps or back up to Google Drive.
+                            </p>
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                <button class="btn btn-secondary" onclick="window.sync.exportSqliteFile()">
+                                    📥 Download SQLite (.db)
+                                </button>
+                                <label class="btn btn-ghost" style="cursor: pointer;">
+                                    📤 Restore SQLite (.db)
+                                    <input type="file" id="fileImportDb" accept=".db,.sqlite,.sqlite3" style="display: none;" onchange="App.handleDbFileImport(event)">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Quick Add Modal -->
+    <div class="modal-overlay" id="quickAddModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">Add to Vault</h3>
+                <button class="modal-close-btn" onclick="App.closeAddModal()">✕</button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" data-type="subscription">Subscription</button>
+                <button class="modal-tab-btn" data-type="account">Account</button>
+                <button class="modal-tab-btn" data-type="prescription">Prescription</button>
+                <button class="modal-tab-btn" data-type="milestone">Milestone</button>
+                <button class="modal-tab-btn" data-type="maintenance">Maintenance</button>
+                <button class="modal-tab-btn" data-type="family">Family Member</button>
+            </div>
+
+            <!-- Form: Subscription -->
+            <form id="formSubscription" class="modal-form active" onsubmit="App.handleAddSubscription(event)">
+                <div class="form-group">
+                    <label class="form-label">Service / Bill Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g., Electric Utility, Spotify" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount ($)</label>
+                        <input type="number" step="0.01" name="amount" class="form-control" placeholder="19.99" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cadence</label>
+                        <select name="cadence" class="form-control">
+                            <option value="Monthly">Monthly</option>
+                            <option value="Annual">Annual</option>
+                            <option value="Weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-control">
+                            <option value="Utilities">Utilities</option>
+                            <option value="Streaming">Streaming</option>
+                            <option value="Software">Software</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Insurance">Insurance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Next Billing Date</label>
+                        <input type="date" name="nextBillingDate" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes (Optional)</label>
+                    <input type="text" name="notes" class="form-control" placeholder="Auto-pay info...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Subscription</button>
+                </div>
+            </form>
+
+            <!-- Form: Account -->
+            <form id="formAccount" class="modal-form" onsubmit="App.handleAddAccount(event)">
+                <div class="form-group">
+                    <label class="form-label">Account Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Chase Freedom" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="accountType" class="form-control">
+                            <option value="Checking">Checking</option>
+                            <option value="Savings">Savings</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Retirement">Retirement</option>
+                            <option value="Investment">Investment</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Balance ($)</label>
+                        <input type="number" step="0.01" name="balance" class="form-control" placeholder="1250.00" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Institution</label>
+                    <input type="text" name="institution" class="form-control" placeholder="e.g. Chase, Vanguard">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Account</button>
+                </div>
+            </form>
+
+            <!-- Form: Prescription -->
+            <form id="formPrescription" class="modal-form" onsubmit="App.handleAddPrescription(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Medication Name</label>
+                        <input type="text" name="medicationName" class="form-control" placeholder="e.g. Lisinopril" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dosage</label>
+                        <input type="text" name="dosage" class="form-control" placeholder="e.g. 10mg">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Instructions / Frequency</label>
+                    <input type="text" name="frequency" class="form-control" placeholder="e.g. Once daily in the morning">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Refills Left</label>
+                        <input type="number" name="refillsRemaining" class="form-control" value="2">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Next Refill Date</label>
+                        <input type="date" name="nextRefillDate" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pharmacy</label>
+                    <input type="text" name="pharmacy" class="form-control" placeholder="e.g. CVS Pharmacy #4102">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Prescription</button>
+                </div>
+            </form>
+
+            <!-- Form: Milestone -->
+            <form id="formMilestone" class="modal-form" onsubmit="App.handleAddMilestone(event)">
+                <div class="form-group">
+                    <label class="form-label">Milestone Title</label>
+                    <input type="text" name="title" class="form-control" placeholder="e.g. Sarah's Birthday" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select name="milestoneType" class="form-control">
+                            <option value="Birthday">Birthday</option>
+                            <option value="Anniversary">Anniversary</option>
+                            <option value="Holiday">Holiday</option>
+                            <option value="Goal">Goal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" name="targetDate" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Gift Ideas / Notes</label>
+                    <input type="text" name="giftIdeas" class="form-control" placeholder="Gift suggestions...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Milestone</button>
+                </div>
+            </form>
+
+            <!-- Form: Maintenance -->
+            <form id="formMaintenance" class="modal-form" onsubmit="App.handleAddMaintenance(event)">
+                <div class="form-group">
+                    <label class="form-label">Service Title</label>
+                    <input type="text" name="title" class="form-control" placeholder="e.g. HVAC Filter Replacement" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-control">
+                            <option value="Vehicle">Vehicle</option>
+                            <option value="Home">Home</option>
+                            <option value="Appliance">Appliance</option>
+                            <option value="Tech">Tech</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Next Due Date</label>
+                        <input type="date" name="nextDueDate" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Est. Cost ($)</label>
+                        <input type="number" step="0.01" name="cost" class="form-control" placeholder="45.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Vendor / DIY</label>
+                        <input type="text" name="vendor" class="form-control" placeholder="DIY">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Maintenance</button>
+                </div>
+            </form>
+
+            <!-- Form: Family Member -->
+            <form id="formFamily" class="modal-form" onsubmit="App.handleAddFamily(event)">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Sarah" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Relationship</label>
+                        <input type="text" name="relationship" class="form-control" placeholder="e.g. Spouse, Child">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" name="phone" class="form-control" placeholder="(555) 000-0000">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer;">
+                        <input type="checkbox" name="isEmergency" value="1">
+                        <span>Mark as Emergency (ICE) Contact</span>
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" onclick="App.closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PWA & SQLite Scripts -->
+    <script src="coi-serviceworker.js"></script>
+    <script src="vendor/sql-wasm.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/voice.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('PWA Service Worker registration skipped:', err));
+            });
+        }
+    </script>
+</body>
+</html>
