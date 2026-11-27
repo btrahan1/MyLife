@@ -582,13 +582,39 @@ class LifeDatabase {
         this.run(`DELETE FROM ${table} WHERE id = :id`, { ':id': id });
     }
 
-    // Compact life context optimized for on-device LLMs (keeps prompts lean and fast)
-    getCompactContext(maxTx = 15) {
+    // Compact life context optimized for on-device LLMs with smart keyword retrieval
+    getCompactContext(prompt = '', maxTx = 40) {
+        // 1. Fetch recent transactions
+        let txRows = this.getTransactions(null, maxTx);
+
+        // 2. Targeted search: if user asks about a specific merchant/term, ensure matching transactions are included
+        if (prompt && typeof prompt === 'string') {
+            const words = prompt.replace(/[^a-zA-Z0-9\s]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length >= 3 && !['what', 'when', 'where', 'have', 'this', 'that', 'with', 'from', 'about', 'much', 'many', 'spend', 'spent', 'bill', 'bills', 'card', 'week', 'month', 'year', 'show', 'tell'].includes(w.toLowerCase()));
+
+            const foundIds = new Set(txRows.map(t => t.id));
+            for (const word of words) {
+                try {
+                    const matches = this.query(
+                        "SELECT t.*, a.name AS account_name, a.institution AS account_institution FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.clean_merchant LIKE :kw OR t.description LIKE :kw OR t.category LIKE :kw ORDER BY t.date DESC LIMIT 10",
+                        { ':kw': `%${word}%` }
+                    );
+                    for (const m of matches) {
+                        if (!foundIds.has(m.id)) {
+                            foundIds.add(m.id);
+                            txRows.unshift(m); // Prioritize targeted matches
+                        }
+                    }
+                } catch { }
+            }
+        }
+
         return JSON.stringify({
             userName: this.getSetting('user_name', 'Bart'),
             accounts: this.getAccounts().map(a => ({ name: a.name, type: a.account_type, balance: a.balance })),
             upcomingBills: this.getSubscriptions().map(s => ({ name: s.name, amount: s.amount, cadence: s.cadence, dueDate: s.next_billing_date })),
-            recentTransactions: this.getTransactions(null, maxTx).map(t => ({ date: t.date, merchant: t.clean_merchant || t.description, amount: t.amount, category: t.category })),
+            transactions: txRows.slice(0, 50).map(t => ({ date: t.date, merchant: t.clean_merchant || t.description, amount: t.amount, category: t.category })),
             prescriptions: this.getPrescriptions().map(p => ({ medication: p.medication_name, dosage: p.dosage, refills: p.refills_remaining, refillDue: p.next_refill_date })),
             appointments: this.getAppointments().map(a => ({ provider: a.provider_name, specialty: a.specialty, date: a.appointment_date, purpose: a.purpose })),
             milestones: this.getMilestones().map(m => ({ title: m.title, for: m.person_or_item, date: m.target_date })),
