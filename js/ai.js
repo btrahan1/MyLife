@@ -101,7 +101,7 @@ class LifeAI {
     // Pre-warm In-Browser WebGPU LLM (WebLLM or Google LiteRT) when user taps the chip
     async prewarmWebLLM() {
         if (!this.hasWebGPU()) return;
-        const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+        const model = window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC');
         const indicator = document.getElementById('copilotModeIndicator');
 
         if (model.startsWith('litert')) {
@@ -254,7 +254,7 @@ class LifeAI {
         }
 
         if (mode === 'webllm') {
-            const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+            const model = window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC');
             if (model.startsWith('litert')) {
                 return this._callLiteRT(prompt, onChunk);
             }
@@ -382,7 +382,7 @@ INSTRUCTIONS:
                    `Falling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
 
-        const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+        const model = window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC');
 
         if (!this.webllmEngine) {
             if (this.webllmLoading) {
@@ -701,7 +701,7 @@ ${text}
 
                 let rawResponse = '';
                 if (mode === 'webllm') {
-                    const model = window.db ? window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC') : '';
+                    const model = window.db ? window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC') : '';
                     if (model.startsWith('litert')) {
                         rawResponse = await this._callLiteRT(prompt);
                     } else {

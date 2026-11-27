@@ -500,8 +500,8 @@ const App = {
 
         if (indicator) {
             if (mode === 'webllm') {
-                const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
-                let shortName = 'Llama 3.2 1B';
+                const model = window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC');
+                let shortName = 'Llama 3.2 3B';
                 if (model === 'litert-gemma-4-e4b') {
                     shortName = 'Gemma 4 E4B (LiteRT MTP)';
                 } else if (model === 'litert-gemma-4-e2b') {
@@ -1146,7 +1146,7 @@ const App = {
 
         const webllmModelSelect = document.getElementById('settingWebLLMModel');
         if (webllmModelSelect) {
-            webllmModelSelect.value = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
+            webllmModelSelect.value = window.db.getSetting('webllm_model', 'Llama-3.2-3B-Instruct-q4f16_1-MLC');
         }
 
         const mode = window.db.getSetting('ai_mode', 'offline');
@@ -1163,7 +1163,7 @@ const App = {
         const localEndpoint = document.getElementById('settingLocalEndpoint').value.trim();
         const cloudApiKey = document.getElementById('settingCloudKey').value.trim();
         const hfToken = document.getElementById('settingHfToken')?.value.trim() || '';
-        const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+        const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
 
         window.db.setSetting('ai_mode', mode);
         window.db.setSetting('user_name', userName);
