@@ -582,6 +582,21 @@ class LifeDatabase {
         this.run(`DELETE FROM ${table} WHERE id = :id`, { ':id': id });
     }
 
+    // Compact life context optimized for on-device LLMs (keeps prompts lean and fast)
+    getCompactContext(maxTx = 15) {
+        return JSON.stringify({
+            userName: this.getSetting('user_name', 'Bart'),
+            accounts: this.getAccounts().map(a => ({ name: a.name, type: a.account_type, balance: a.balance })),
+            upcomingBills: this.getSubscriptions().map(s => ({ name: s.name, amount: s.amount, cadence: s.cadence, dueDate: s.next_billing_date })),
+            recentTransactions: this.getTransactions(null, maxTx).map(t => ({ date: t.date, merchant: t.clean_merchant || t.description, amount: t.amount, category: t.category })),
+            prescriptions: this.getPrescriptions().map(p => ({ medication: p.medication_name, dosage: p.dosage, refills: p.refills_remaining, refillDue: p.next_refill_date })),
+            appointments: this.getAppointments().map(a => ({ provider: a.provider_name, specialty: a.specialty, date: a.appointment_date, purpose: a.purpose })),
+            milestones: this.getMilestones().map(m => ({ title: m.title, for: m.person_or_item, date: m.target_date })),
+            maintenance: this.getMaintenance().map(m => ({ title: m.title, due: m.next_due_date, cost: m.cost })),
+            shopping: this.getShoppingItems().filter(i => !i.is_completed).map(s => s.title)
+        }, null, 2);
+    }
+
     // Full Life Vault JSON for Co-Pilot context
     getFullContextJson() {
         return JSON.stringify({

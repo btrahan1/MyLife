@@ -82,6 +82,9 @@ class LifeAI {
 
             this.litertEngine = await litert.Engine.create({
                 model: stream,
+                mainExecutorSettings: {
+                    maxNumTokens: 8192
+                },
                 speculativeDecodingConfig: {
                     mode: 'ON'
                 }
@@ -280,7 +283,7 @@ class LifeAI {
         const apiKey = window.db.getSetting('cloud_api_key', '');
         const model = mode === 'local' ? 'qwen3.8-27b' : window.db.getSetting('cloud_model', 'gpt-4o-mini');
 
-        const contextJson = window.db.getFullContextJson();
+        const contextJson = window.db.getCompactContext ? window.db.getCompactContext(15) : window.db.getFullContextJson();
 
         const systemPrompt = `You are MyLife Co-Pilot, an intelligent, empathetic personal life assistant.
 You help the user manage their finances, health, prescriptions, milestones, home/car maintenance, and daily schedule.
@@ -408,7 +411,7 @@ INSTRUCTIONS:
             }
         }
 
-        const contextJson = window.db.getFullContextJson();
+        const contextJson = window.db.getCompactContext ? window.db.getCompactContext(15) : window.db.getFullContextJson();
         const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal life assistant running directly inside the user's browser GPU via WebLLM.
 All data is stored in the user's private SQLite vault on this device.
 CURRENT LIFE CONTEXT DATA:
@@ -480,7 +483,7 @@ INSTRUCTIONS:
             return `⚠️ Failed to initialize Google LiteRT ${modelLabel} (${err.message}).${hint}\n\nFalling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
 
-        const contextJson = window.db.getFullContextJson();
+        const contextJson = window.db.getCompactContext ? window.db.getCompactContext(15) : window.db.getFullContextJson();
         const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal life assistant powered by ${modelLabel} with speculative decoding running locally on device WebGPU via Google LiteRT-LM.
 All data is stored in the user's private SQLite vault on this device.
 
@@ -546,7 +549,7 @@ INSTRUCTIONS:
                 return `⚠️ Gemini Nano is not available on this device hardware (status: ${capabilities.available}).`;
             }
 
-            const contextJson = window.db.getFullContextJson();
+            const contextJson = window.db.getCompactContext ? window.db.getCompactContext(15) : window.db.getFullContextJson();
             const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal assistant.
 All data is stored in the user's private SQLite vault on this device.
 Use this context to answer accurately:
