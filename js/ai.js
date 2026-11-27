@@ -17,6 +17,84 @@ class LifeAI {
         return typeof navigator !== 'undefined' && !!navigator.gpu;
     }
 
+    // Create a tracked stream to give real-time download percentage for multi-GB models
+    async _createTrackedModelStream(url, hfToken, onProgress) {
+        const headers = {};
+        if (hfToken) headers['Authorization'] = `Bearer ${hfToken}`;
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status} fetching model weights: ${response.statusText}`);
+        }
+        const totalBytes = parseInt(response.headers.get('content-length') || '0', 10);
+        let loadedBytes = 0;
+        let lastReport = 0;
+        const reader = response.body.getReader();
+
+        return new ReadableStream({
+            async start(controller) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    loadedBytes += value.byteLength;
+                    if (totalBytes > 0 && onProgress && (loadedBytes - lastReport > 6 * 1024 * 1024 || loadedBytes === totalBytes)) {
+                        lastReport = loadedBytes;
+                        onProgress(loadedBytes, totalBytes);
+                    }
+                    controller.enqueue(value);
+                }
+                controller.close();
+            }
+        });
+    }
+
+    // Shared LiteRT-LM initializer with live progress feedback
+    async _getOrInitLiteRT(onProgressMsg) {
+        if (this.litertEngine) return this.litertEngine;
+        if (this.litertLoading) {
+            throw new Error("Model is currently downloading/initializing. Please wait a moment...");
+        }
+
+        this.litertLoading = true;
+        const modelKey = window.db.getSetting('webllm_model', 'litert-gemma-4-e4b');
+        const isE2B = modelKey === 'litert-gemma-4-e2b';
+        const modelLabel = isE2B ? 'Gemma 4 E2B' : 'Gemma 4 E4B';
+        const modelFileName = isE2B ? 'gemma-4-E2B-it-web.litertlm' : 'gemma-4-E4B-it-web.litertlm';
+        const repoName = isE2B ? 'litert-community/gemma-4-E2B-it-litert-lm' : 'litert-community/gemma-4-E4B-it-litert-lm';
+        const modelUrl = `https://huggingface.co/${repoName}/resolve/main/${modelFileName}`;
+        const hfToken = window.db.getSetting('hf_token', '');
+
+        try {
+            if (onProgressMsg) onProgressMsg(`🌐 Loading @litert-lm/core WebGPU engine...`);
+            const litert = await import("https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm");
+
+            if (onProgressMsg) onProgressMsg(`🌐 Connecting to Hugging Face for ${modelLabel} (~${isE2B ? '1.9GB' : '2.8GB'})...`);
+
+            const stream = await this._createTrackedModelStream(modelUrl, hfToken, (loaded, total) => {
+                const pct = Math.round((loaded / total) * 100);
+                const mbLoaded = Math.round(loaded / (1024 * 1024));
+                const mbTotal = Math.round(total / (1024 * 1024));
+                if (onProgressMsg) {
+                    onProgressMsg(`🌐 Downloading ${modelLabel}: ${pct}% (${mbLoaded}MB / ${mbTotal}MB)...`);
+                }
+            });
+
+            if (onProgressMsg) onProgressMsg(`🧠 Compiling WebGPU shaders & loading VRAM with MTP Speculative Decoding...`);
+
+            this.litertEngine = await litert.Engine.create({
+                model: stream,
+                speculativeDecodingConfig: {
+                    mode: 'ON'
+                }
+            });
+
+            this.litertLoading = false;
+            return this.litertEngine;
+        } catch (err) {
+            this.litertLoading = false;
+            throw err;
+        }
+    }
+
     // Pre-warm In-Browser WebGPU LLM (WebLLM or Google LiteRT) when user taps the chip
     async prewarmWebLLM() {
         if (!this.hasWebGPU()) return;
@@ -25,35 +103,20 @@ class LifeAI {
 
         if (model.startsWith('litert')) {
             if (this.litertEngine || this.litertLoading) return;
-            this.litertLoading = true;
-            const modelLabel = model === 'litert-gemma-4-e2b' ? 'Gemma 4 E2B' : 'Gemma 4 E4B';
-            if (indicator) {
-                indicator.innerText = `Engine: 🌐 Google LiteRT ${modelLabel} (Loading MTP into VRAM...)`;
-                indicator.style.color = "var(--accent-amber)";
-            }
+            const isE2B = model === 'litert-gemma-4-e2b';
+            const modelLabel = isE2B ? 'Gemma 4 E2B' : 'Gemma 4 E4B';
             try {
-                const litert = await import("https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm");
-                const hfRepo = model === 'litert-gemma-4-e2b'
-                    ? 'hf://litert-community/gemma-4-E2B-it-litert-lm'
-                    : 'hf://litert-community/gemma-4-E4B-it-litert-lm';
-                const hfToken = window.db.getSetting('hf_token', '');
-                const engineSettings = {
-                    model: hfRepo,
-                    speculativeDecodingConfig: {
-                        mode: 'ON'
+                await this._getOrInitLiteRT((msg) => {
+                    if (indicator) {
+                        indicator.innerText = `Engine: ${msg}`;
+                        indicator.style.color = "var(--accent-amber)";
                     }
-                };
-                if (hfToken) {
-                    engineSettings.accessToken = hfToken;
-                }
-                this.litertEngine = await litert.Engine.create(engineSettings);
-                this.litertLoading = false;
+                });
                 if (indicator) {
                     indicator.innerText = `Engine: 🌐 ${modelLabel} (LiteRT WebGPU Ready ⚡)`;
                     indicator.style.color = "var(--accent-emerald)";
                 }
             } catch (err) {
-                this.litertLoading = false;
                 console.error("LiteRT prewarm error:", err);
                 if (indicator) {
                     indicator.innerText = `Engine: 🌐 LiteRT GPU: ${err.message}`;
@@ -396,46 +459,25 @@ INSTRUCTIONS:
         }
 
         const modelKey = window.db.getSetting('webllm_model', 'litert-gemma-4-e4b');
-        const hfRepo = modelKey === 'litert-gemma-4-e2b'
-            ? 'hf://litert-community/gemma-4-E2B-it-litert-lm'
-            : 'hf://litert-community/gemma-4-E4B-it-litert-lm';
-        const modelLabel = modelKey === 'litert-gemma-4-e2b' ? 'Gemma 4 E2B' : 'Gemma 4 E4B';
-        const hfToken = window.db.getSetting('hf_token', '');
+        const isE2B = modelKey === 'litert-gemma-4-e2b';
+        const modelLabel = isE2B ? 'Gemma 4 E2B' : 'Gemma 4 E4B';
 
-        if (!this.litertEngine) {
-            if (this.litertLoading) {
-                return `⏳ Google LiteRT-LM (${modelLabel}) is currently initializing in the background. Please wait a moment...`;
-            }
-
-            this.litertLoading = true;
-            try {
-                if (onChunk) onChunk(`🌐 Loading @litert-lm/core WebGPU runtime...`);
-                const litert = await import("https://cdn.jsdelivr.net/npm/@litert-lm/core/+esm");
-
-                if (onChunk) onChunk(`🧠 Initializing ${modelLabel} with MTP Speculative Decoding on WebGPU...\n(Fetching weights & compiling shaders)`);
-
-                const engineSettings = {
-                    model: hfRepo,
-                    speculativeDecodingConfig: {
-                        mode: 'ON'
-                    }
-                };
-
-                if (hfToken) {
-                    engineSettings.accessToken = hfToken;
+        try {
+            await this._getOrInitLiteRT((msg) => {
+                if (onChunk) onChunk(msg);
+                const indicator = document.getElementById('copilotModeIndicator');
+                if (indicator) {
+                    indicator.innerText = `Engine: ${msg}`;
+                    indicator.style.color = "var(--accent-amber)";
                 }
-
-                this.litertEngine = await litert.Engine.create(engineSettings);
-                this.litertLoading = false;
-            } catch (err) {
-                this.litertLoading = false;
-                console.error("LiteRT load error:", err);
-                const isGatedError = err.message && (err.message.includes('401') || err.message.includes('403') || err.message.includes('gated') || err.message.includes('Unauthorized'));
-                const hint = isGatedError
-                    ? `\n\n💡 *Tip: Gemma 4 requires accepting Google's license agreement on Hugging Face. Once accepted, enter your Hugging Face Access Token in Settings.*`
-                    : '';
-                return `⚠️ Failed to initialize Google LiteRT ${modelLabel} (${err.message}).${hint}\n\nFalling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
-            }
+            });
+        } catch (err) {
+            console.error("LiteRT load error:", err);
+            const isGatedError = err.message && (err.message.includes('401') || err.message.includes('403') || err.message.includes('gated') || err.message.includes('Unauthorized'));
+            const hint = isGatedError
+                ? `\n\n💡 *Tip: Gemma 4 requires accepting Google's license agreement on Hugging Face. Once accepted, enter your Hugging Face Access Token in Settings.*`
+                : '';
+            return `⚠️ Failed to initialize Google LiteRT ${modelLabel} (${err.message}).${hint}\n\nFalling back to on-device rules:\n\n` + this._runOfflineRuleEngine(prompt);
         }
 
         const contextJson = window.db.getFullContextJson();
