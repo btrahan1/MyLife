@@ -483,22 +483,24 @@ INSTRUCTIONS:
         const contextJson = window.db.getFullContextJson();
         const systemPrompt = `You are MyLife Co-Pilot, an intelligent personal life assistant powered by ${modelLabel} with speculative decoding running locally on device WebGPU via Google LiteRT-LM.
 All data is stored in the user's private SQLite vault on this device.
-CURRENT LIFE CONTEXT DATA:
+
+CURRENT LIFE CONTEXT DATA (from private SQLite vault):
 \`\`\`json
 ${contextJson}
 \`\`\`
+
 INSTRUCTIONS:
-- Answer clearly, concisely, and supportively.
+- Answer clearly, concisely, and supportively using the context data above.
 - Use clear Markdown formatting with bullet points and bold text.
 - Reference facts and accurately calculate totals and upcoming dates from the data.`;
 
+        const userPromptWithContext = `${systemPrompt}\n\nUSER QUESTION: ${prompt}`;
+
         try {
             if (onChunk) onChunk(""); // clear status text
-            const conversation = await this.litertEngine.createConversation({
-                systemPrompt: systemPrompt
-            });
+            const conversation = await this.litertEngine.createConversation();
 
-            const stream = conversation.sendMessageStreaming(prompt);
+            const stream = conversation.sendMessageStreaming(userPromptWithContext);
             let fullText = "";
             for await (const chunk of stream) {
                 let delta = '';
