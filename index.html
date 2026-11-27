@@ -235,7 +235,8 @@
                     <!-- Statement Transactions Ledger & Category Breakdown -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                         <h2 class="subheading" style="margin: 0;">Statement Transactions &amp; Activity</h2>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-sm btn-ghost" style="color: var(--accent-rose); font-size: 12px; padding: 4px 10px;" onclick="App.clearTransactionsAndStatements()" title="Clear all imported statement transactions and card balances">🗑️ Clear</button>
                             <select id="txAccountFilter" class="form-control" style="width: auto; padding: 4px 10px; font-size: 12px;" onchange="App.filterTransactions()">
                                 <option value="">All Accounts</option>
                             </select>

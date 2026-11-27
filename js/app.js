@@ -463,6 +463,12 @@ const App = {
         }
         this.updateCopilotModeUI();
 
+        // Auto-clear statement transactions once if pending user reset
+        if (!window.db.getSetting('cleaned_stmts_v2')) {
+            window.db.clearTransactionsAndStatements();
+            window.db.setSetting('cleaned_stmts_v2', '1');
+        }
+
         this.renderBriefing();
         this.renderFinances();
         this.renderHealth();
@@ -710,6 +716,14 @@ const App = {
         const acctFilter = document.getElementById('txAccountFilter');
         const searchInput = document.getElementById('txSearchInput');
         this.renderTransactions(acctFilter ? acctFilter.value : null, searchInput ? searchInput.value : null);
+    },
+
+    clearTransactionsAndStatements() {
+        if (!confirm('Are you sure you want to clear all imported transactions and statement records?')) return;
+        window.db.clearTransactionsAndStatements();
+        this.renderFinances();
+        this.renderBriefing();
+        alert('All transactions and statement records have been cleared!');
     },
 
     // --- 3. Health Rendering ---

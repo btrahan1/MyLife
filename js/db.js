@@ -568,6 +568,13 @@ class LifeDatabase {
         });
     }
 
+    clearTransactionsAndStatements() {
+        this.run("DELETE FROM transactions;");
+        this.run("DELETE FROM subscriptions WHERE notes LIKE '%Statement Balance%' OR name LIKE '%(…%' OR notes LIKE '%Min Due:%';");
+        this.run("DELETE FROM accounts WHERE name LIKE '%(…%' OR name LIKE '%Credit Card (…%' OR name LIKE '%Visa Signature%';");
+        this.persist();
+    }
+
     deleteRecord(table, id) {
         // Sanitize table name against whitelist
         const allowed = ['accounts', 'subscriptions', 'transactions', 'prescriptions', 'appointments', 'milestones', 'maintenance', 'shopping_items', 'voice_notes', 'family_members'];
