@@ -463,12 +463,6 @@ const App = {
         }
         this.updateCopilotModeUI();
 
-        // Auto-clear statement transactions once if pending user reset
-        if (!window.db.getSetting('cleaned_stmts_v2')) {
-            window.db.clearTransactionsAndStatements();
-            window.db.setSetting('cleaned_stmts_v2', '1');
-        }
-
         this.renderBriefing();
         this.renderFinances();
         this.renderHealth();
