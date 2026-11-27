@@ -423,24 +423,54 @@ INSTRUCTIONS:
 - Use clear Markdown formatting with bullet points and bold text.
 - Reference facts and accurately calculate totals and upcoming dates from the data.`;
 
+        const isMicroModel = model.toLowerCase().includes('360m') || model.toLowerCase().includes('0.5b') || model.toLowerCase().includes('135m');
+        const temperature = isMicroModel ? 0.6 : 0.3;
+
         try {
             if (onChunk) onChunk(""); // clear loading message before streaming answer
-            const chunks = await this.webllmEngine.chat.completions.create({
+            const requestPayload = {
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.3,
+                temperature: temperature,
                 max_tokens: 1024,
                 stream: true
-            });
+            };
+
+            // Apply anti-repetition penalties to prevent micro models from looping
+            if (isMicroModel) {
+                requestPayload.frequency_penalty = 0.8;
+                requestPayload.presence_penalty = 0.4;
+            }
+
+            const chunks = await this.webllmEngine.chat.completions.create(requestPayload);
 
             let fullText = "";
+            let repetitionCount = 0;
+
             for await (const chunk of chunks) {
                 const delta = chunk.choices[0]?.delta?.content || "";
                 if (delta) {
                     fullText += delta;
                     if (onChunk) onChunk(delta);
+
+                    // Repetition safeguard: detect and break infinite repeating loops
+                    if (delta.includes('\n')) {
+                        const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+                        if (lines.length >= 3) {
+                            const latest = lines[lines.length - 1];
+                            const prev = lines[lines.length - 2];
+                            if (latest.length > 15 && latest === prev) {
+                                repetitionCount++;
+                                if (repetitionCount >= 2) {
+                                    break; // Abort loop cleanly
+                                }
+                            } else {
+                                repetitionCount = 0;
+                            }
+                        }
+                    }
                 }
             }
             return fullText.trim() || "(No response generated.)";
