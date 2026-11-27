@@ -485,14 +485,22 @@
                             </div>
 
                             <div class="form-group" style="margin-top: 16px;">
-                                <label class="form-label">In-Browser WebLLM Model (WebGPU)</label>
+                                <label class="form-label">In-Browser WebGPU Model</label>
                                 <select id="settingWebLLMModel" class="form-control">
-                                    <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama-3.2-1B-Instruct (~750MB, Recommended / Default)</option>
-                                    <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama-3.2-3B-Instruct (~2.2GB, Max Intelligence)</option>
+                                    <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama-3.2-1B-Instruct (~750MB, Recommended / Fast Mobile)</option>
+                                    <option value="litert-gemma-4-e4b">✨ Gemma 4 E4B (Google LiteRT-LM + Speculative Decoding, ~3.6GB)</option>
+                                    <option value="litert-gemma-4-e2b">✨ Gemma 4 E2B (Google LiteRT-LM + Speculative Decoding, ~2.1GB)</option>
+                                    <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama-3.2-3B-Instruct (~2.2GB, WebLLM High Intelligence)</option>
                                     <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct (~350MB, Ultra-Fast)</option>
                                     <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2-360M-Instruct (~220MB, Micro)</option>
                                 </select>
-                                <small style="color: var(--text-muted); font-size: 12px;">Cached once in browser storage via WebGPU. Runs on device GPU completely offline.</small>
+                                <small style="color: var(--text-muted); font-size: 12px;">Cached once in browser storage via WebGPU. Runs completely offline on your device GPU.</small>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 12px;" id="hfTokenGroup">
+                                <label class="form-label">Hugging Face Access Token (Optional)</label>
+                                <input type="password" id="settingHfToken" class="form-control" placeholder="hf_...">
+                                <small style="color: var(--text-muted); font-size: 12px;">Required if loading gated models (e.g. Gemma 4) directly from Hugging Face. Stored 100% locally in your private SQLite vault.</small>
                             </div>
 
                             <div class="form-group" style="margin-top: 16px;">

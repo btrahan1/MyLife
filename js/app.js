@@ -501,7 +501,14 @@ const App = {
         if (indicator) {
             if (mode === 'webllm') {
                 const model = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
-                const shortName = model.split('-')[0] + ' ' + model.split('-')[1];
+                let shortName = 'Llama 3.2 1B';
+                if (model === 'litert-gemma-4-e4b') {
+                    shortName = 'Gemma 4 E4B (LiteRT MTP)';
+                } else if (model === 'litert-gemma-4-e2b') {
+                    shortName = 'Gemma 4 E2B (LiteRT MTP)';
+                } else if (model.includes('-')) {
+                    shortName = model.split('-')[0] + ' ' + (model.split('-')[1] || '');
+                }
                 indicator.innerText = `Engine: 🌐 In-Browser WebGPU (${shortName} on device)`;
                 indicator.style.color = '#38bdf8';
             } else if (mode === 'local') {
@@ -1124,6 +1131,11 @@ const App = {
         document.getElementById('settingLocalEndpoint').value = window.db.getSetting('local_endpoint', 'http://127.0.0.1:8081/v1');
         document.getElementById('settingCloudKey').value = window.db.getSetting('cloud_api_key', '');
         
+        const hfTokenInput = document.getElementById('settingHfToken');
+        if (hfTokenInput) {
+            hfTokenInput.value = window.db.getSetting('hf_token', '');
+        }
+
         const webllmModelSelect = document.getElementById('settingWebLLMModel');
         if (webllmModelSelect) {
             webllmModelSelect.value = window.db.getSetting('webllm_model', 'Llama-3.2-1B-Instruct-q4f16_1-MLC');
@@ -1142,15 +1154,18 @@ const App = {
         const userName = document.getElementById('settingUserName').value.trim() || 'Bart';
         const localEndpoint = document.getElementById('settingLocalEndpoint').value.trim();
         const cloudApiKey = document.getElementById('settingCloudKey').value.trim();
+        const hfToken = document.getElementById('settingHfToken')?.value.trim() || '';
         const webllmModel = document.getElementById('settingWebLLMModel')?.value || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
         window.db.setSetting('ai_mode', mode);
         window.db.setSetting('user_name', userName);
         window.db.setSetting('local_endpoint', localEndpoint);
         window.db.setSetting('cloud_api_key', cloudApiKey);
+        window.db.setSetting('hf_token', hfToken);
         window.db.setSetting('webllm_model', webllmModel);
 
         alert('Settings saved successfully!');
+        this.updateCopilotModeUI();
         this.loadDashboard();
     },
 
